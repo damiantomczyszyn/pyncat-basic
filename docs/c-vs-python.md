@@ -261,7 +261,39 @@ Dwie uwagi, żeby nie przeczytać tej tabeli zbyt optymistycznie:
   **nie jest wąskim gardłem**. Różnica 2,5× jest widoczna wyłącznie na
   loopbacku, gdzie nie ma sieci.
 
-### 3.5 Czego NIE zmierzyłem
+### 3.5 Kontrola na drugiej maszynie: co jest własnością kodu, a co sprzętu
+
+Ten sam `ci/bench.py --quick` jedzie w CI na runnerze GitHuba — zupełnie
+innym CPU (**INTEL(R) XEON(R) PLATINUM 8573C**, jądro 7.0.0-azure) niż maszyna
+z §1.1 (Xeon @ 2,10 GHz). Porównanie obu przebiegów rozdziela wyniki na te,
+które są własnością **kodu**, i te, które są własnością **sprzętu**.
+
+| Metryka | maszyna z §1.1 | runner GitHuba | czy wniosek się trzyma |
+|---|---|---|---|
+| `poll` / `write` — Python kontra C | identyczne | **identyczne** | **tak, dokładnie** |
+| Przepustowość po odjęciu startu, C/Python | 2,18× | 2,59× | tak, co do rzędu |
+| Narzut startu, C/Python | 28× | 42× | tak, co do rzędu |
+| Skan `-z`, C/Python | 7,7× | 10,6× | tak, co do rzędu |
+| RSS, C/Python | 9,8× | 8,0× | tak, co do rzędu |
+| Kierunek trendu BUFSIZE | spada z 6,8× do 2,0× | spada z 4,3× do 2,8× | **tak** |
+| Przepustowość bezwzględna (Python, 16 KiB) | 616 MiB/s | 421 MiB/s | **nie — zależy od CPU** |
+
+Dwa wnioski o samych pomiarach, nie o netcacie:
+
+* **Identyczność liczby syscalli odtworzyła się co do jednego** na innym
+  procesororze, innym jądrze i innej wersji kompilatora. Musiała — to
+  własność algorytmu, nie maszyny. Gdyby się nie odtworzyła, znaczyłoby to,
+  że jedna z implementacji robi coś innego, niż myślę.
+* **Wszystkie stosunki są tego samego rzędu, ale żaden nie jest ten sam.**
+  Dlatego w tym dokumencie podaję, na czym mierzyłem, i dlatego benchmark
+  w CI jest artefaktem, a nie bramką jakości: oblewanie builda za wariancję
+  między runnerami byłoby oblewaniem go za pogodę.
+
+Liczba, która najbardziej się rozjechała, to narzut startu Pythona: 61,8 ms
+kontra 34,0 ms. Runner jest po prostu szybszy w I/O — import `socket`,
+`select` i `dataclasses` to w większości czytanie `.pyc` z dysku.
+
+### 3.6 Czego NIE zmierzyłem
 
 Uczciwie, bo to ogranicza wnioski:
 
