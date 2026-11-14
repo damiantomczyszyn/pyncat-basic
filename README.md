@@ -74,11 +74,21 @@ socketów** — maszynę stanów.
 > **Hosting wymaga jednego kliknięcia po Twojej stronie.** W pierwszym
 > przebiegu CI job `pages` oblał się komunikatem *„Get Pages site failed.
 > Please verify that the repository has Pages enabled"*, bo GitHub Pages nie
-> jest w tym repo włączone. Workflow ma teraz `enablement: true`, więc
-> spróbuje włączyć je sam; jeśli uprawnienia organizacji na to nie pozwolą,
-> trzeba ręcznie: **Settings → Pages → Source: GitHub Actions**. Job ma
-> `continue-on-error`, więc brak hostingu **nie oblewa CI** — to ustawienie
-> repozytorium, nie regresja w kodzie.
+> jest w tym repo włączone. Dołożyłem `enablement: true` do
+> `configure-pages`, żeby workflow włączył je sam — i **to nie zadziałało**:
+>
+> ```
+> Create Pages site failed.
+> Error: Resource not accessible by integration
+> ```
+>
+> `GITHUB_TOKEN` nie ma prawa utworzyć witryny Pages. Trzeba to zrobić
+> ręcznie, raz: **Settings → Pages → Source: GitHub Actions**. Po włączeniu
+> job zadziała bez żadnej zmiany w kodzie.
+>
+> Job ma `continue-on-error`, więc brak hostingu **nie oblewa CI** — cały
+> przebieg jest zielony mimo czerwonego `pages`. To ustawienie repozytorium,
+> nie regresja.
 
 #### Czego w demo NIE zweryfikowałem — i to jest istotne
 
@@ -389,10 +399,11 @@ Uczciwie, bo to ogranicza wnioski:
 - **Dociąganie Pyodide z CDN-u w demo** — proxy w środowisku builda blokuje
   `cdn.jsdelivr.net`. Logika demo i obsługa porażki są sprawdzone (wyżej),
   samo dostarczenie ~10 MB WASM-a przez CDN — nie.
-- **Publikacja na GitHub Pages** — job `pages` oblał się w pierwszym
-  przebiegu, bo Pages nie jest włączone w ustawieniach repo. Dodane
-  `enablement: true` ma to naprawić, ale **nie zostało jeszcze potwierdzone
-  zielonym przebiegiem** tego joba.
+- **Publikacja na GitHub Pages** — niemożliwa bez działania właściciela repo.
+  `enablement: true` zostało sprawdzone i **odrzucone** przez GitHuba
+  (`Resource not accessible by integration`), więc Pages trzeba włączyć
+  ręcznie w Settings. Dopóki tego nie zrobisz, job `pages` jest czerwony,
+  a cały przebieg CI i tak zielony.
 
 ---
 
