@@ -220,7 +220,7 @@ bajt w bajt zgodny z netcatem** (to kanał danych); różni się wyłącznie
 Dwie uwagi o rozbieżnościach, które **nie** są kwestią języka:
 
 * Przy nieznanej nazwie usługi upstream mówi `service "%s" unknown`
-  [netcat.c:1472], a Debian 1.226 `port number invalid`. `pyncat` trzyma się
+  [netcat.c:1470], a Debian 1.226 `port number invalid`. `pyncat` trzyma się
   **upstreamu**, bo to jest kanoniczne źródło tego projektu.
 * `pyncat` zachowuje angielskie łańcuchy `strtonum(3)` (`too large`,
   `too small`, `invalid`), bo są wklejane w komunikat przez ten sam mechanizm
