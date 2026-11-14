@@ -239,9 +239,14 @@ jobs:
   pages:
     name: Publikacja demo na GitHub Pages
     needs: [demo, lint, test]
-    # Tylko z gałęzi głównej i tylko gdy Pages jest włączone w ustawieniach
-    # repo. Gdy nie jest — ten job pada, a reszta CI i tak przeszła, więc
-    # brak hostingu nie oblewa builda. Dlatego `continue-on-error`.
+    # Tylko z gałęzi głównej. `continue-on-error` jest tu celowe: hosting to
+    # ustawienie repozytorium, nie kod. Gdy Pages jest wyłączone, ten job
+    # pada, ale PRZEBIEG JEST ZIELONY — brak hostingu nie jest regresją.
+    # Pierwszy przebieg CI dokładnie tak się zachował:
+    #   "Get Pages site failed. Please verify that the repository has Pages
+    #    enabled and configured to build using GitHub Actions"
+    # Dlatego niżej jest `enablement: true` — configure-pages spróbuje
+    # włączyć Pages samo, korzystając z uprawnienia `pages: write`.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -260,6 +265,12 @@ jobs:
       - name: Złóż stronę z wynikiem realnego testu sieciowego, jeśli jest
         run: python web/build_site.py web/dist
       - uses: actions/configure-pages@v5
+        with:
+          # Włącz Pages, jeśli jeszcze nie jest włączone. Wymaga, by
+          # w Settings -> Actions -> General workflow miał prawo zapisu;
+          # jeśli organizacja to blokuje, trzeba włączyć Pages ręcznie
+          # (Settings -> Pages -> Source: GitHub Actions).
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

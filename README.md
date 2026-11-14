@@ -58,16 +58,57 @@ i czym to zastąpić: [`docs/netcat-architecture.md`](docs/netcat-architecture.m
 
 | Gdzie | Co dostajesz | Czego nie dostajesz |
 |---|---|---|
-| **[Demo w przeglądarce](https://damiantomczyszyn.github.io/pyncat-basic/)** | Maszynę stanów `readwrite()` krok po kroku — **prawdziwy `pyncat/relay.py`** uruchomiony przez Pyodide na atrapach deskryptorów. Dziewięć scenariuszy: half-close z `-N` i bez, EOF z sieci, limit `-W`, timer `-q`, backpressure. Plus parsowanie portów i tablica kodów wyjścia. | Transferu danych — przeglądarka **nie ma socketów** TCP/UDP. Pyodide też nie. Szczegóły i uzasadnienie: [`docs/demo-i-hosting.md`](docs/demo-i-hosting.md). |
+| **[Demo w przeglądarce](https://damiantomczyszyn.github.io/pyncat-basic/)** (wymaga włączenia Pages — zobacz niżej) | Maszynę stanów `readwrite()` krok po kroku — **prawdziwy `pyncat/relay.py`** uruchomiony przez Pyodide na atrapach deskryptorów. Dziewięć scenariuszy: half-close z `-N` i bez, EOF z sieci, limit `-W`, timer `-q`, backpressure. Plus parsowanie portów i tablica kodów wyjścia. | Transferu danych — przeglądarka **nie ma socketów** TCP/UDP. Pyodide też nie. Szczegóły i uzasadnienie: [`docs/demo-i-hosting.md`](docs/demo-i-hosting.md). |
 | **[GitHub Actions](https://github.com/damiantomczyszyn/pyncat-basic/actions)** | Realny test sieciowy: nginx, redis i echo UDP w kontenerach, odpytywane po adresie na mostku `docker0` — przez prawdziwy ARP, bridge i routing. | Interaktywności — odpala się na push. |
 | **Lokalnie** | Wszystko. Zero zależności poza biblioteką standardową. | — |
 
 Dlaczego demo nie przesyła danych: netcat to narzędzie sieciowe, a przeglądarka
 ma tylko `fetch`, WebSocket i WebRTC — wszystko z narzuconym protokołem.
 `socket.socket(AF_INET, SOCK_STREAM)` w Pyodide **nie działa**, bo WASM nie ma
-backendu socketowego. Udawanie, że działa, byłoby kłamstwem; zamiast tego demo
-pokazuje tę część, która jest tu najciekawsza i **nie wymaga socketów** —
-maszynę stanów.
+backendu socketowego. Gorzej: `connect()` na zamknięty port tam *udaje sukces*
+(zmierzone — [`docs/demo-i-hosting.md`](docs/demo-i-hosting.md) §5), więc demo
+„na prawdziwych socketach" pokazywałoby wyniki, które są nieprawdą. Zamiast
+tego demo pokazuje tę część, która jest tu najciekawsza i **nie wymaga
+socketów** — maszynę stanów.
+
+> **Hosting wymaga jednego kliknięcia po Twojej stronie.** W pierwszym
+> przebiegu CI job `pages` oblał się komunikatem *„Get Pages site failed.
+> Please verify that the repository has Pages enabled"*, bo GitHub Pages nie
+> jest w tym repo włączone. Workflow ma teraz `enablement: true`, więc
+> spróbuje włączyć je sam; jeśli uprawnienia organizacji na to nie pozwolą,
+> trzeba ręcznie: **Settings → Pages → Source: GitHub Actions**. Job ma
+> `continue-on-error`, więc brak hostingu **nie oblewa CI** — to ustawienie
+> repozytorium, nie regresja w kodzie.
+
+#### Czego w demo NIE zweryfikowałem — i to jest istotne
+
+Demo można zbudować lokalnie:
+
+```bash
+python3 web/build_site.py _preview
+```
+
+i otworzyć `_preview/index.html` w przeglądarce. **Ale start wymaga
+ściągnięcia Pyodide** (CPython skompilowany do WebAssembly, ~10 MB z
+`cdn.jsdelivr.net`), a tego **nie udało mi się sprawdzić**: w środowisku,
+w którym to powstało, proxy blokuje ten CDN (`curl` zwraca kod 000).
+
+Co **jest** sprawdzone:
+
+* **Logika demo** — `web/build_site.py --selftest` przepuszcza 9 scenariuszy
+  przez prawdziwy `pyncat/relay.py`, a `web/test_page.mjs` wczytuje prawdziwy
+  `index.html` do jsdom-a, wykonuje prawdziwe `app.js` i podstawia **Pyodide
+  z pakietu npm** (czyli bez CDN-u). Oba przechodzą, także w CI.
+* **Renderowanie i obsługa porażki** — stronę otwarto w prawdziwym Chromium
+  z `file://`. Renderuje się poprawnie, a gdy Pyodide nie da się wczytać,
+  pokazuje dokładny komunikat z listą obu prób (`./pyodide/` i CDN) zamiast
+  wisieć na „pobieranie Pyodide".
+
+Czego **nie jest** sprawdzone: że Pyodide faktycznie dociąga się z CDN-u
+w przeglądarce z normalnym dostępem do internetu. Powinno — ale tego nie
+widziałem i nie będę udawać, że widziałem. Jeśli start zawiedzie, strona
+przyjmuje inne źródło w adresie (`?pyodide=https://…/full/`) albo lokalną
+kopię zworkowaną do `_preview/pyodide/`.
 
 ### Co weryfikuje CI
 
@@ -345,6 +386,13 @@ Uczciwie, bo to ogranicza wnioski:
   ograniczenie oryginału, nie nasze; na loopbacku działa niezawodnie.
 - **PyPy** — luka z §3.3 `c-vs-python.md` to czysty narzut interpretera,
   czyli idealny materiał dla JIT-a. Nie sprawdzone.
+- **Dociąganie Pyodide z CDN-u w demo** — proxy w środowisku builda blokuje
+  `cdn.jsdelivr.net`. Logika demo i obsługa porażki są sprawdzone (wyżej),
+  samo dostarczenie ~10 MB WASM-a przez CDN — nie.
+- **Publikacja na GitHub Pages** — job `pages` oblał się w pierwszym
+  przebiegu, bo Pages nie jest włączone w ustawieniach repo. Dodane
+  `enablement: true` ma to naprawić, ale **nie zostało jeszcze potwierdzone
+  zielonym przebiegiem** tego joba.
 
 ---
 
