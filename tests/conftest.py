@@ -77,21 +77,28 @@ requires_c_ref = pytest.mark.skipif(
 # --------------------------------------------------------------------------
 
 
-def free_port(kind: int = socket.SOCK_STREAM) -> int:
+def free_port(kind: int = socket.SOCK_STREAM, host: str = HOST) -> int:
     """Port, który w tej chwili jest wolny.
 
     Klasyczny wyścig (ktoś może zająć port między ``close()`` a startem
     serwera) jest tu nieunikniony, bo netcat nie umie bindować portu 0 —
     nie miałby jak zgłosić, który port dostał. W praktyce wystarczające,
     bo testy używają portów efemerycznych, których nikt inny nie szuka.
+
+    ``host`` wyznacza rodzinę adresów. IPv4 i IPv6 mają **osobne przestrzenie
+    portów**, więc port wolny na ``127.0.0.1`` nie musi być wolny na ``::1``.
     """
-    with socket.socket(socket.AF_INET, kind) as s:
-        s.bind((HOST, 0))
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family, kind) as s:
+        s.bind((host, 0))
         return s.getsockname()[1]
 
 
 def wait_until_bound(
-    port: int, kind: int = socket.SOCK_STREAM, timeout: float = 15.0
+    port: int,
+    kind: int = socket.SOCK_STREAM,
+    timeout: float = 15.0,
+    host: str = HOST,
 ) -> bool:
     """Czeka, aż port zostanie zajęty przez listener.
 
@@ -99,12 +106,22 @@ def wait_until_bound(
     na zajętym porcie zwraca ``EADDRINUSE`` zarówno dla TCP w stanie LISTEN,
     jak i dla zbindowanego gniazda UDP. Z ``SO_REUSEADDR`` drugi ``bind()``
     na port UDP by się udał i sonda nic by nie wykryła.
+
+    ``host`` musi być tym samym adresem, na którym nasłuchuje serwer, bo
+    **rodzina adresów jest z niego wyprowadzana**. Pierwsza wersja tej funkcji
+    miała ``AF_INET`` na stałe i przez to oblewała test IPv6: serwer siedział
+    na ``::1``, sonda próbowała bindować ``127.0.0.1`` — a ten port w
+    przestrzeni IPv4 był wolny, więc ``bind()`` się udawał i sonda raportowała
+    „jeszcze nie gotowy" aż do timeoutu. Lokalnie tego nie było widać, bo bez
+    loopbacku IPv6 test jest pomijany; wyszło dopiero na runnerze GitHuba,
+    który IPv6 ma.
     """
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        with socket.socket(socket.AF_INET, kind) as probe:
+        with socket.socket(family, kind) as probe:
             try:
-                probe.bind((HOST, port))
+                probe.bind((host, port))
             except OSError:
                 return True
         time.sleep(0.02)

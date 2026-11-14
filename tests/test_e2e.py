@@ -487,18 +487,53 @@ class TestRodzinaAdresow:
         assert server.stdout_bytes == b"IPV4"
 
     @requires_ipv6
-    def test_6_wymusza_ipv6(self, runner, port) -> None:
+    def test_6_wymusza_ipv6(self, runner) -> None:
+        """Pełny transfer po ``::1``, wymuszony ``-6``.
+
+        Port bierzemy z przestrzeni IPv6 i sondujemy gotowość **na ``::1``**,
+        a nie na ``127.0.0.1``: to dwie osobne przestrzenie portów, więc
+        sonda IPv4 nie zobaczy listenera IPv6 (i odwrotnie). Ten test oblał
+        się dokładnie na tym w pierwszym przebiegu CI.
+        """
+        port = free_port(host="::1")
         server = runner.spawn(
             [*PYNCAT_CMD, "-6", "-l", "::1", str(port)], close_stdin=True
         )
-        assert wait_until_bound(port)
+        assert wait_until_bound(port, host="::1"), (
+            f"serwer nie zbindował [::1]:{port}: {server.stderr_text}"
+        )
         client = runner.spawn(
             [*PYNCAT_CMD, "-6", "-N", "-w", "5", "::1", str(port)],
             stdin_data=b"IPV6",
         )
-        assert client.wait(15) == 0
+        assert client.wait(15) == 0, client.stderr_text
         server.wait(15)
         assert server.stdout_bytes == b"IPV6"
+
+    @requires_ipv6
+    def test_6_z_zakresem_portow(self, runner) -> None:
+        """Zakres portów po IPv6 — ścieżka build_ports + getaddrinfo(AF_INET6)."""
+        base = free_port(host="::1")
+        server = runner.spawn(
+            [*PYNCAT_CMD, "-6", "-l", "::1", str(base)], close_stdin=True
+        )
+        assert wait_until_bound(base, host="::1")
+        scan = runner.spawn(
+            [
+                *PYNCAT_CMD,
+                "-6",
+                "-z",
+                "-v",
+                "-w",
+                "3",
+                "-n",
+                "::1",
+                f"{base}-{base + 2}",
+            ],
+            close_stdin=True,
+        )
+        assert scan.wait(30) == 0, scan.stderr_text
+        server.kill()
 
 
 class TestAdresZrodlowy:
