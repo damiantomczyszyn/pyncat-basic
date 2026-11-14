@@ -1,0 +1,267 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# Anuluj poprzedni przebieg dla tej samej gałęzi — nie ma sensu płacić
+# minutami za wyniki, których nikt już nie przeczyta.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "ruff>=0.6"
+      - name: ruff check
+        run: ruff check .
+      - name: Brak zależności zewnętrznych
+        # Pakiet ma stać na samej bibliotece standardowej. Instalujemy go
+        # bez pytest-a i importujemy — gdyby coś się wkradło, import padnie.
+        run: |
+          pip install --no-deps -e .
+          python -c "import pyncat; print('pyncat', pyncat.__version__)"
+          python -m pyncat -h > /dev/null
+
+  test:
+    name: pytest (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 to minimum z pyproject.toml, 3.13 to wersja bieżąca.
+        # 3.11 w środku, żeby wyłapać regresje specyficzne dla wersji.
+        python: ["3.10", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install pytest
+      - name: Zainstaluj netcat-openbsd (testy interop)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq netcat-openbsd
+          nc -h 2>&1 | head -1
+      - name: Zbuduj wersję C (testy interop i parzystości)
+        run: make -C c_reference
+      - name: pytest
+        run: python -m pytest tests/ -v --durations=10
+      - name: Czy IPv6 był testowany, czy pominięty
+        # Testy IPv6 są pomijane bez działającego loopbacku IPv6. Chcemy
+        # wiedzieć, które z nich faktycznie się wykonały — pominięty test
+        # niczego nie dowodzi.
+        if: always()
+        run: |
+          python -c "
+          import socket
+          try:
+              s = socket.socket(socket.AF_INET6); s.bind(('::1', 0)); s.close()
+              print('IPv6 loopback: DOSTĘPNY — testy -6 wykonane')
+          except OSError as e:
+              print(f'IPv6 loopback: NIEDOSTĘPNY ({e}) — testy -6 POMINIĘTE')
+          "
+
+  c-build:
+    name: C11 (zero ostrzeżeń) + ASAN
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wersja kompilatora
+        run: cc --version
+
+      - name: Build z zerową tolerancją na ostrzeżenia
+        # Makefile ma -Wall -Wextra -Wpedantic -Werror na stałe, więc samo
+        # `make` wystarczy. Mimo to liczymy ostrzeżenia osobno: gdyby ktoś
+        # kiedyś usunął -Werror, ten krok nadal to złapie.
+        run: |
+          set -o pipefail
+          make -C c_reference clean
+          make -C c_reference 2>&1 | tee build.log
+          if grep -qE 'warning:|error:' build.log; then
+            echo "::error::Build wyprodukował ostrzeżenia — zero tolerancji"
+            grep -E 'warning:|error:' build.log
+            exit 1
+          fi
+          echo "Zero ostrzeżeń."
+
+      - name: Jawna weryfikacja flag ostrzeżeń
+        run: |
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror -O2 \
+             -c c_reference/pyncat_ref.c -o /dev/null
+          echo "OK również przy ręcznym wywołaniu."
+
+      - name: Build pod ASAN/UBSAN
+        run: make -C c_reference asan
+
+      - name: AddressSanitizer + UBSan + LeakSanitizer
+        # Pokrywa transfer 1 MiB, wszystkie ścieżki błędów (getaddrinfo to
+        # najczęstsze źródło wycieków), zakres 30 portów, pętlę -k i UDP.
+        run: bash ci/asan_check.sh
+
+      - name: Cele debug i clean
+        run: |
+          make -C c_reference debug
+          test -x c_reference/pyncat_ref_debug
+          make -C c_reference clean
+          test ! -e c_reference/pyncat_ref
+
+      - name: Żadnego wykonywania procesów w binarce
+        # Twarda granica projektu: pyncat nie ma -e i nie będzie miał.
+        run: |
+          make -C c_reference
+          if nm -u c_reference/pyncat_ref | grep -qwE \
+              'execl|execle|execlp|execv|execve|execvp|system|popen|fork|vfork|posix_spawn|forkpty'; then
+            echo "::error::Binarka importuje symbole do uruchamiania procesów"
+            nm -u c_reference/pyncat_ref | grep -wE \
+              'execl|execve|execvp|system|popen|fork|posix_spawn'
+            exit 1
+          fi
+          echo "Brak symboli exec/fork/system — OK."
+
+  network:
+    name: Realny test sieciowy (kontenery, nie loopback)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Zbuduj wersję C
+        run: make -C c_reference
+
+      - name: Stan sieci runnera
+        run: |
+          ip -brief addr show || true
+          docker network inspect bridge -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+
+      - name: Test sieciowy przez mostek dockerowy
+        # To NIE jest loopback: łączymy się po adresie kontenera na mostku,
+        # czyli przez prawdziwy ARP, bridge i routing jądra. Skrypt kończy
+        # się kodem != 0 przy JAKIEJKOLWIEK rozbieżności z oczekiwaniem —
+        # nie wypisuje ostrzeżeń „do przejrzenia".
+        run: python ci/network_check.py --backend docker --json network.json
+
+      - name: Wynik testu sieciowego
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-check
+          path: network.json
+          if-no-files-found: warn
+
+      - name: Sprzątanie kontenerów
+        if: always()
+        run: |
+          docker rm -f pyncat-nginx pyncat-redis pyncat-udpecho 2>/dev/null || true
+
+  bench:
+    name: Benchmark C vs Python
+    runs-on: ubuntu-latest
+    # Benchmark nie jest bramką jakości — na współdzielonym runnerze liczby
+    # skaczą i oblewanie builda za wariancję CPU byłoby bezsensowne.
+    # Zbieramy je jako artefakt, żeby dało się śledzić trend.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Zainstaluj netcat-openbsd (punkt odniesienia) i strace
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq netcat-openbsd strace
+      - name: Zbuduj wersję C
+        run: make -C c_reference
+      - name: Benchmark (tryb skrócony)
+        run: python ci/bench.py --quick --json bench.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench
+          path: bench.json
+          if-no-files-found: warn
+
+  demo:
+    name: Demo w przeglądarce (build + test strony)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Self-test maszyny stanów po stronie Pythona
+        # Odpala scenariusze demo na prawdziwym pyncat/relay.py z atrapami
+        # deskryptorów i sprawdza kontrakt (kroki, odnośniki do netcat.c,
+        # semantyka -q). Nie tyka app.js.
+        run: python web/build_site.py --selftest
+
+      - name: Złóż stronę
+        run: |
+          python web/build_site.py web/dist
+          test -f web/dist/index.html
+          test -f web/dist/modules.js
+          echo "Strona złożona: $(du -sh web/dist | cut -f1)"
+
+      - name: Test strony end-to-end (jsdom + prawdziwe Pyodide)
+        # Bez tego kroku „demo działa" znaczyłoby tylko „plik się parsuje":
+        # self-test wyżej nie wykonuje ANI JEDNEJ linii app.js. Tutaj
+        # wczytujemy prawdziwy index.html, wykonujemy prawdziwe app.js
+        # i podstawiamy prawdziwe Pyodide z npm.
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          PYNCAT_SITE=../web/dist node test_page.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo-site
+          path: web/dist
+          if-no-files-found: warn
+
+  pages:
+    name: Publikacja demo na GitHub Pages
+    needs: [demo, lint, test]
+    # Tylko z gałęzi głównej i tylko gdy Pages jest włączone w ustawieniach
+    # repo. Gdy nie jest — ten job pada, a reszta CI i tak przeszła, więc
+    # brak hostingu nie oblewa builda. Dlatego `continue-on-error`.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Złóż stronę z wynikiem realnego testu sieciowego, jeśli jest
+        run: python web/build_site.py web/dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
