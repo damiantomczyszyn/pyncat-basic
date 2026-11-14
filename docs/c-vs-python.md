@@ -481,10 +481,17 @@ Linie kodu bez komentarzy, docstringów i pustych:
 
 | | linie kodu | linie wszystkich |
 |---|---|---|
-| `pyncat/` (10 modułów) | **855** | 1 876 |
-| `c_reference/pyncat_ref.c` | **859** | 1 545 |
+| `pyncat/` (10 modułów) | **851** | 1 878 |
+| `c_reference/pyncat_ref.c` | **882** | 1 609 |
 
-**Praktycznie tyle samo.** Spodziewałem się, że Python będzie wyraźnie
+Metoda liczenia, bo przy takim wyniku ma znaczenie: dla Pythona tokenizer
+``tokenize`` (bez komentarzy, docstringów i pustych linii), dla C usuwanie
+komentarzy z **poszanowaniem literałów napisowych** — naiwny regex na
+``/* */`` wycina też zawartość napisów zawierających te znaki i zaniża wynik
+o kilkadziesiąt linii. Pierwsza wersja tego pomiaru właśnie tak zrobiła
+i dała 859 zamiast 882.
+
+**Praktycznie tyle samo — a dokładniej: wersja w C jest o 3,6% DŁUŻSZA.** Spodziewałem się, że Python będzie wyraźnie
 krótszy — zwykle jest. Nie jest, i to jest pouczające: ten kod składa się
 z **maszyny stanów i obsługi syscalli**, a nie z przetwarzania struktur
 danych. Python wygrywa tam, gdzie można zastąpić dwadzieścia linii pętli

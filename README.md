@@ -301,7 +301,7 @@ i odtworzenie: [`docs/c-vs-python.md`](docs/c-vs-python.md) §1):
 | Narzut startu (`-h`) | 61,8 ms | 2,2 ms | 1,4 ms | **28×** |
 | Skan `-z` (2000 portów) | 63,8 µs/port | 8,3 µs/port | 8,1 µs/port | **7,7×** |
 | RSS (`VmHWM`) | 16 152 KiB | 1 648 KiB | 1 824 KiB | **9,8×** |
-| Linie kodu (bez komentarzy) | **855** | **859** | — | **1,0×** |
+| Linie kodu (bez komentarzy) | **851** | **882** | — | **1,04×** |
 
 Dwa wyniki, które były dla mnie najciekawsze:
 
@@ -314,7 +314,7 @@ około **5 µs**. Dlatego stosunek C/Python spada z **6,8×** przy buforze 512 B
 do **2,0×** przy 64 KiB: przy dużym buforze dominuje kopiowanie bajtów przez
 jądro, które kosztuje tyle samo w obu językach.
 
-**Kod jest tej samej długości** — 855 wobec 859 linii. Spodziewałem się, że
+**Kod jest praktycznie tej samej długości** — 851 wobec 882 linii, czyli C jest o 3,6% DŁUŻSZE. Spodziewałem się, że
 Python będzie wyraźnie krótszy; nie jest, bo ten program składa się z maszyny
 stanów i obsługi syscalli, a nie z przetwarzania struktur danych. W dwóch
 miejscach Python potrzebuje **więcej** kodu niż C: emulacji tablicy `pollfd`
