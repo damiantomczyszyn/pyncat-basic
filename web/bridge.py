@@ -138,7 +138,7 @@ class Deadlock(Exception):
 
     To **nie jest** błąd demo — to dokładnie ta sytuacja, w której prawdziwy
     netcat wisi w nieskończoność. Scenariusz „half-close bez ``-N``" kończy
-    się właśnie tak, i to jest jego puenta: POMIAR z GROUND_TRUTH §2.6 mówi
+    się właśnie tak, i to jest jego puenta: POMIAR z docs/tablice-decyzyjne.md §1 mówi
     7,701 s do zabicia przez ``timeout``, czyli „wiecznie".
     """
 
@@ -795,7 +795,7 @@ class Tracer:
 # Każdy scenariusz to: flagi (Opts), harmonogram zdarzeń na zegarze
 # wirtualnym, opcjonalne okna zapisu (dla backpressure) i opcjonalna reakcja
 # peera na nasz FIN. Wszystkie czasy i oczekiwane wyniki pochodzą
-# z POMIARÓW w GROUND_TRUTH — odnośniki w polu ``measured``.
+# z POMIARÓW w docs/tablice-decyzyjne.md — odnośniki w polu ``measured``.
 
 
 def _d(kind: str, **kw) -> dict:
@@ -838,10 +838,10 @@ SCENARIOS: dict[str, dict] = {
             (5, _d("stdin_eof")),
         ],
         "expect": (
-            "Deadlock. POMIAR (GROUND_TRUTH §2.6): klient żył 7,701 s i "
+            "Deadlock. POMIAR (docs/tablice-decyzyjne.md §1): klient żył 7,701 s i "
             "został zabity przez `timeout`, czyli wisiał w nieskończoność."
         ),
-        "measured": "GROUND_TRUTH §2.6",
+        "measured": "docs/tablice-decyzyjne.md §1",
     },
     "halfclose-z-N": {
         "title": "Half-close Z -N → czyste zakończenie",
@@ -860,10 +860,10 @@ SCENARIOS: dict[str, dict] = {
         ],
         "on_shutdown_wr": [_d("net_close", after_ms=5)],
         "expect": (
-            "Wyjście przez warunek 1. POMIAR (GROUND_TRUTH §2.6): 0,008 s "
+            "Wyjście przez warunek 1. POMIAR (docs/tablice-decyzyjne.md §1): 0,008 s "
             "— natychmiast."
         ),
-        "measured": "GROUND_TRUTH §2.6",
+        "measured": "docs/tablice-decyzyjne.md §1",
     },
     "eof-z-sieci": {
         "title": "EOF z sieci (peer wysyła FIN pierwszy)",
@@ -906,17 +906,17 @@ SCENARIOS: dict[str, dict] = {
             (800, _d("net_data", data=b"C")),
         ],
         "expect": (
-            "Na stdout trafia dokładnie `AB`. POMIAR (GROUND_TRUTH §2.5): "
+            "Na stdout trafia dokładnie `AB`. POMIAR (docs/tablice-decyzyjne.md §9.3): "
             "klient -W 2 odebrał `AB`."
         ),
-        "measured": "GROUND_TRUTH §2.5",
+        "measured": "docs/tablice-decyzyjne.md §9.3",
     },
     "q-timer": {
         "title": "-q 2 — czekaj 2 s po EOF na stdin",
         "cmd": "printf 'X' | pyncat -q 2 127.0.0.1 9000",
         "opts": {"qflag": 2},
         "lead": (
-            "Łatka Debiana, w upstream tego nie ma (GROUND_TRUTH §8). Po EOF "
+            "Łatka Debiana, w upstream tego nie ma (docs/tablice-decyzyjne.md §9.4). Po EOF "
             "na stdin uzbraja się deadline; poll() dostaje min(-w, resztę -q). "
             "Peer odpowiada po 1,5 s, czyli zmieścił się w limicie — dane "
             "dolatują, a potem deadline kończy pętlę."
@@ -928,10 +928,10 @@ SCENARIOS: dict[str, dict] = {
         ],
         "expect": (
             "`DELAYED` dolatuje, wyjście po ~2 s wirtualnych. POMIAR "
-            "(GROUND_TRUTH §8): -q 2 → 2,007 s; -q 0 → 0,007 s i `DELAYED` "
+            "(docs/tablice-decyzyjne.md §9.4): -q 2 → 2,007 s; -q 0 → 0,007 s i `DELAYED` "
             "przepada; bez -q → 8,602 s."
         ),
-        "measured": "GROUND_TRUTH §8",
+        "measured": "docs/tablice-decyzyjne.md §9.4",
     },
     "q-zero": {
         "title": "-q 0 — wyjdź natychmiast po EOF na stdin",
@@ -947,8 +947,8 @@ SCENARIOS: dict[str, dict] = {
             (5, _d("stdin_eof")),
             (1500, _d("net_data", data=b"DELAYED")),
         ],
-        "expect": "Na stdout nic. POMIAR (GROUND_TRUTH §8): -q 0 → 0,007 s, bez `DELAYED`.",
-        "measured": "GROUND_TRUTH §8",
+        "expect": "Na stdout nic. POMIAR (docs/tablice-decyzyjne.md §9.4): -q 0 → 0,007 s, bez `DELAYED`.",
+        "measured": "docs/tablice-decyzyjne.md §9.4",
     },
     "backpressure": {
         "title": "Backpressure — wąskie okno zapisu",

@@ -152,12 +152,12 @@ const withN = btns.find((b) => b.dataset.name === "halfclose-z-N");
 withN.dispatchEvent(new window.Event("click"));
 ok($("outcome").dataset.kind === "return", `outcome = ${$("outcome").dataset.kind}`);
 
-console.log("\n== -W 2 przepuszcza dokładnie AB (POMIAR: GROUND_TRUTH §2.5) ==");
+console.log("\n== -W 2 przepuszcza dokładnie AB (POMIAR: docs/tablice-decyzyjne.md §9.3) ==");
 btns.find((b) => b.dataset.name === "W-limit").dispatchEvent(new window.Event("click"));
 const wOut = $("outcome").textContent;
 ok(/'AB'/.test(wOut), `w outcome widać stdout: ${/b'[^']*'/.exec(wOut)?.[0]}`);
 
-console.log("\n== -q 0 gubi odpowiedź, -q 2 nie (POMIAR: GROUND_TRUTH §8) ==");
+console.log("\n== -q 0 gubi odpowiedź, -q 2 nie (POMIAR: docs/tablice-decyzyjne.md §9.4) ==");
 btns.find((b) => b.dataset.name === "q-zero").dispatchEvent(new window.Event("click"));
 ok(/0 B/.test($("outcome").textContent), "-q 0 → 0 B na stdout");
 btns.find((b) => b.dataset.name === "q-timer").dispatchEvent(new window.Event("click"));

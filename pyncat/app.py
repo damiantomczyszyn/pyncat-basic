@@ -43,7 +43,7 @@ def _run_client(opts: Options) -> int:
     **bez dotknięcia ``ret``** [netcat.c:701-702]. Stąd kwirk, który łatwo
     przegapić: w skanie zakresu wystarczy **jeden** otwarty port, by proces
     skończył się z 0, nawet jeśli wszystkie następne są zamknięte.
-    Zweryfikowane na ``nc.openbsd 1.226`` (GROUND_TRUTH §4).
+    Zweryfikowane na ``nc.openbsd 1.226`` (docs/tablice-decyzyjne.md §4).
     """
     assert opts.uport is not None
     ret = EXIT_FAIL
@@ -68,7 +68,8 @@ def _run_client(opts: Options) -> int:
             # a delay time between connections to multiple ports", ale w kodzie
             # upstream ``iflag`` występuje wyłącznie w pętli readwrite
             # [netcat.c:1153], a w Debianie 1.226 jest mierzalnym no-opem
-            # (GROUND_TRUTH §2.3). Implementujemy to, co obiecuje dokumentacja.
+            # (docs/tablice-decyzyjne.md §9.1). Implementujemy to, co obiecuje
+            # dokumentacja.
             if opts.iflag and index > 0:
                 time.sleep(opts.iflag)
 

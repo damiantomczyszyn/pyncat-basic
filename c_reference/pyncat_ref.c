@@ -675,7 +675,7 @@ main(int argc, char *argv[])
 				close(s);
 
 			/*
-			 * ODSTĘPSTWO (świadome, decyzja 6 z GROUND_TRUTH):
+			 * ODSTĘPSTWO (świadome, decyzja opisana w docs/tablice-decyzyjne.md §9.5):
 			 * upstream NIE ma przerwy między portami - iflag
 			 * występuje w netcat.c wyłącznie w [netcat.c:1153]
 			 * wewnątrz readwrite(). Man page (nc.1:162) obiecuje
@@ -897,7 +897,7 @@ local_listen(const char *host, const char *port, struct addrinfo hints)
 			continue;
 
 		/*
-		 * ODSTĘPSTWO (świadome, decyzja 4 z GROUND_TRUTH):
+		 * ODSTĘPSTWO (świadome, decyzja opisana w docs/tablice-decyzyjne.md §9.6):
 		 * [netcat.c:1063] upstream ustawia SO_REUSEPORT, bo w pętli -k
 		 * zamyka i otwiera listener od nowa. Na Linuksie SO_REUSEPORT
 		 * ma INNĄ semantykę niż na BSD: pozwala wielu NIEZALEŻNYM

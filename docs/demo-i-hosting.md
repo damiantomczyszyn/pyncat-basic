@@ -265,7 +265,7 @@ w Pyodide, nie zapowiedzi:
 | backpressure, okno 6 B | `return` | — | 40 B | 273 |
 | stdout zniknął (`POLLERR`) | `return` | `dane` | — | 111 |
 
-Trzy z tych wyników to odtworzenie POMIARÓW na prawdziwym `nc` z GROUND_TRUTH:
+Trzy z tych wyników to odtworzenie POMIARÓW na prawdziwym `nc` z docs/tablice-decyzyjne.md:
 
 * `-W 2` → dokładnie `AB` (§2.5 — bo `-W` liczy **odczyty**, nie pakiety),
 * `-q 2` → `DELAYED` dolatuje; `-q 0` → przepada (§8),

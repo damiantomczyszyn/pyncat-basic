@@ -104,7 +104,7 @@ class TestHalfClose:
         Druga strona NIE dostaje FIN-u, więc nie wie, że nadawanie się
         skończyło. To jest powód, dla którego ``nc host port < plik`` bez
         ``-N`` nigdy się nie kończy — pomiar: 7,701 s do zabicia
-        (GROUND_TRUTH §2.6).
+        (docs/tablice-decyzyjne.md §1).
         """
         h = harness_factory()
         h.feed_stdin(b"DANE")
@@ -241,7 +241,7 @@ class TestRecvLimit:
 
 
 class TestQuitTimer:
-    """Łatka Debiana ``-q``. Brak w upstream — GROUND_TRUTH §8."""
+    """Łatka Debiana ``-q``. Brak w upstream — docs/tablice-decyzyjne.md §9.4."""
 
     def test_q_zero_konczy_natychmiast_po_eof(self, harness_factory) -> None:
         h = harness_factory(qflag=0)

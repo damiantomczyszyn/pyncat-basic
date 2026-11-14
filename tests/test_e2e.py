@@ -190,7 +190,7 @@ class TestKodyWyjscia:
 
         Wystarczy JEDEN otwarty port w zakresie, żeby proces skończył się
         z 0 — nawet jeśli pozostałe są zamknięte. Zweryfikowane na
-        nc.openbsd 1.226 (GROUND_TRUTH §4).
+        nc.openbsd 1.226 (docs/tablice-decyzyjne.md §4).
         """
         base = free_port()
         server = runner.spawn([*PYNCAT_CMD, "-l", str(base)], close_stdin=True)

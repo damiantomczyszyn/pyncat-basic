@@ -32,14 +32,14 @@ deskryptorze**. Wycofanie jednego nie rusza drugiego.
 |---|---|---|---|
 | EOF na stdin, **bez `-N`** | `POLL_NETOUT` | **NIE** | 1291–1296 |
 | EOF na stdin, **z `-N`** | `POLL_NETOUT` | **TAK** (`shutdown(SHUT_WR)`) | 1293–1294 |
-| EOF z sieci (`read` → 0) | `POLL_NETIN` | — (`shutdown(SHUT_RD)` lokalnie) | 1247–1251 |
-| `POLLHUP` na `POLL_NETOUT` | `POLL_NETOUT` | TAK, jeśli `-N` | 1176–1181 |
-| `POLLHUP` na stdout | `POLL_STDOUT` | nie dotyczy | 1182–1183 |
-| `POLL_NETOUT` martwy | `POLL_STDIN` (kaskada) | nie | 1184–1185 |
-| `POLL_STDOUT` martwy | `POLL_NETIN` (kaskada) + `shutdown(SHUT_RD)` | nie | 1186–1192 |
+| EOF z sieci (`read` → 0) | `POLL_NETIN` | — (`shutdown(SHUT_RD)` lokalnie) | 1251–1255 |
+| `POLLHUP` na `POLL_NETOUT` | `POLL_NETOUT` | TAK, jeśli `-N` | 1183–1187 |
+| `POLLHUP` na stdout | `POLL_STDOUT` | nie dotyczy | 1188–1190 |
+| `POLL_NETOUT` martwy | `POLL_STDIN` (kaskada) | nie | 1191–1193 |
+| `POLL_STDOUT` martwy | `POLL_NETIN` (kaskada) + `shutdown(SHUT_RD)` | nie | 1194–1199 |
 | `POLL_NETIN` martwy i bufor pusty | `POLL_STDOUT` (kaskada) | nie | 1297–1300 |
-| limit `-W` osiągnięty | `POLL_NETIN` **i** `POLL_STDIN` | nie | 1252–1258 |
-| `POLLERR` / `POLLNVAL` na dowolnym | ten slot | nie | 1161–1165 |
+| limit `-W` osiągnięty | `POLL_NETIN` **i** `POLL_STDIN` | nie | 1256–1261 |
+| `POLLERR` / `POLLNVAL` na dowolnym | ten slot | nie | 1166–1171 |
 
 ### Dlaczego brak `-N` to nie błąd
 
@@ -65,13 +65,13 @@ Pełny cykl z `-N`:
 klient: EOF na stdin
      -> shutdown(SHUT_WR)              [1293]
 serwer: read() -> 0 (EOF na netin)
-     -> POLL_NETIN.fd = -1             [1248-1250]
+     -> POLL_NETIN.fd = -1             [1251-1255]
      -> bufor pusty => POLL_STDOUT.fd = -1   [1297-1300]
-     -> warunek 3 (lflag && netin==-1) => return    [1143-1147]
-     -> close(connfd)                  [1646]
+     -> warunek 3 (lflag && netin==-1) => return    [1144-1147]
+     -> close(connfd)                  [651]
 klient: read() -> 0 (EOF na netin)
      -> POLL_NETIN.fd = -1
-     -> warunek 1 (stdin==-1 && netin==-1 && bufory puste) => return  [1137]
+     -> warunek 1 (stdin==-1 && netin==-1 && bufory puste) => return  [1137-1140]
 ```
 
 Testy: `tests/test_relay.py::TestHalfClose`, `tests/test_e2e.py::TestHalfClose`.
@@ -98,7 +98,7 @@ Stan to czwórka `(STDIN, NETOUT, NETIN, STDOUT)`, gdzie `+` = żywy,
 | `(−,−,+,+)` | EOF z sieci | `(−,−,−,−)` | **koniec** (warunek 1) |
 | `(+,+,+,+)` | EOF z sieci | `(+,+,−,−)` | bez `-l`: **wisimy** na stdin |
 | `(+,+,−,−)` | — | — | warunek 3 kończy to tylko z `-l` |
-| `(+,+,+,+)` | stdout zamknięty (`\| head`) | `(−,−,−,−)` | kaskada 1186→1184, **koniec** |
+| `(+,+,+,+)` | stdout zamknięty (`\| head`) | `(−,−,−,−)` | kaskada 1194→1191, **koniec** |
 | `(+,+,+,+)` | limit `-W` | `(−,−,−,+)` → `(−,−,−,−)` | **koniec** |
 | `(+,+,+,+)` | `-d` od startu | `(−,+,+,+)` | jednokierunkowy odbiór |
 | `(−,+,+,+)` | EOF z sieci | `(−,−,−,−)` | **koniec** — `-d` wystarczy bez `-N` |
@@ -394,7 +394,7 @@ dokładniejsze niż `nc.1`.
 | źródło | co twierdzi / robi |
 |---|---|
 | `nc(1)` linia 320 | „Terminate after receiving *recvlimit* **packets** from the network." |
-| kod | `++recvcount` przy **każdym wejściu** w blok „read from network" [1252], czyli raz na iterację pętli, w której sieć była czytelna |
+| kod | `++recvcount` przy **każdym wejściu** w blok „read from network" [1256], czyli raz na iterację pętli, w której sieć była czytelna |
 | **pyncat** | tak samo jak kod |
 
 Pomiar: serwer wysyła `A`, pauza 0,4 s, `B`, pauza 0,4 s, `C`. Klient `-W 2`

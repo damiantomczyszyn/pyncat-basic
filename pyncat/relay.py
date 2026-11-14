@@ -354,7 +354,7 @@ def readwrite(
             # Czwarty warunek, nieobecny w upstream: deadline -q.
             # Umieszczony razem z pozostałymi warunkami wyjścia, bo jest
             # warunkiem terminacji. Pomiar potwierdza taką semantykę:
-            # ``-q 2`` kończy się po 2,007 s (GROUND_TRUTH §8).
+            # ``-q 2`` kończy się po 2,007 s (docs/tablice-decyzyjne.md §9.4).
             if quit_deadline is not None and time.monotonic() >= quit_deadline:
                 return
 
@@ -366,7 +366,7 @@ def readwrite(
             # nowej linii — więc sleep w pętli „is as good as it gets".
             #
             # Uwaga: w Debianie 1.226 ta flaga jest mierzalnym NO-OPEM
-            # (GROUND_TRUTH §2.3). Implementujemy semantykę kodu upstream.
+            # (docs/tablice-decyzyjne.md §9.1). Implementujemy semantykę kodu upstream.
             if opts.iflag:
                 time.sleep(opts.iflag)
 
@@ -443,7 +443,8 @@ def readwrite(
                 # fillbuf zwrócił EOF albo EAGAIN — to literalna semantyka
                 # ``++recvcount`` z oryginału. Man page mówi „packets", ale
                 # dla TCP granice read() nie mają nic wspólnego z granicami
-                # segmentów: pomiar w GROUND_TRUTH §2.5 pokazuje, że ``-W 2``
+                # segmentów: pomiar w docs/tablice-decyzyjne.md §9.3 pokazuje,
+                # że ``-W 2``
                 # przepuszcza dwa odczyty, nie dwa pakiety.
                 if opts.recvlimit > 0:
                     state.recvcount += 1
@@ -485,7 +486,7 @@ def readwrite(
             # Bez -N netcat po EOF na stdin TYLKO przestaje pisać do socketu —
             # nie wysyła FIN. Druga strona nigdy się nie dowiaduje, że
             # nadawanie się skończyło, więc transfer pliku nigdy się nie
-            # kończy. Pomiar (GROUND_TRUTH §2.6): bez -N klient wisiał do
+            # kończy. Pomiar (docs/tablice-decyzyjne.md §1): bez -N klient wisiał do
             # zabicia (7,701 s), z -N wyszedł po 0,008 s.
             #
             # Dlatego przykład „DATA TRANSFER" w nc(1) używa ``nc -N``.
@@ -494,7 +495,7 @@ def readwrite(
                     _shutdown(net_sock, socket.SHUT_WR)
                 pfd[POLL_NETOUT].fd = FD_RETIRED
 
-                # -q (łatka Debiana, brak w upstream — GROUND_TRUTH §8).
+                # -q (łatka Debiana, brak w upstream — docs/tablice-decyzyjne.md §9.4).
                 # Uzbrajamy dopiero tutaj, bo semantyka to „po EOF na stdin".
                 #   -q 0  → wyjdź natychmiast (dane w locie przepadają)
                 #   -q N>0→ czekaj N sekund, potem wyjdź bezwarunkowo

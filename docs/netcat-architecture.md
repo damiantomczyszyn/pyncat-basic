@@ -13,8 +13,8 @@ sprawdzić.
 
 **Numery linii `[netcat.c:NNNN]` odnoszą się do rev. 1.241; `[nc.1:NNNN]` do
 roff-owego źródła man page rev. 1.101.** Zostały zweryfikowane `grep`-em na kopii
-rev. 1.241, nie przepisane z notatek — tabela sprostowań wobec `GROUND_TRUTH.md`
-jest w §2.4.
+rev. 1.241 i sprawdzone `grep`-em po treści, a nie przez odejmowanie numerów
+z indeksu funkcji. Jak zweryfikować je samemu — §2.4.
 
 > **Licencja.** `netcat.c` jest na licencji BSD 3-clause (Eric Jackson 2001,
 > Bob Beck 2015). W tym repo **nie ma ani jednej linii kodu skopiowanej
@@ -197,53 +197,26 @@ przesunięć o kilka wierszy):
 | `udptest()` / cztery zapisy | 1534 / 1542 |
 | `connection_info()` / `report_sock()` | 1552 / 1807 |
 
-#### Sprostowania wobec `GROUND_TRUTH.md`
+#### Dwie rzeczy, które łatwo policzyć źle
 
-`GROUND_TRUTH.md` §1 i §2 podają część numerów z przesunięciem. **Przesunięcie
-nie jest stałe ani jednokierunkowe** — od 2 wierszy za mało (`BUFSIZE`) przez
-4–9 za mało w `readwrite()` do 26–27 za dużo przy walidacji flag i `hints`. Nie
-da się więc dodać jednej poprawki do wszystkiego; każde odwołanie trzeba
-sprawdzić osobno. **Obowiązuje kolumna „rev. 1.241"**; tabele powyżej są
-sprawdzone `grep`-em po treści. Pozycje, które pyncat cytuje w komentarzach:
-
-| Element | `GROUND_TRUTH.md` | rev. 1.241 (poprawnie) |
-|---|---|---|
-| `PORT_MAX` | 60 | **62** |
-| `POLL_STDIN`…`POLL_STDOUT` | 62–66 | **65–68** |
-| `BUFSIZE` | 67 | **69** |
-| `recvcount, recvlimit` | 120 | **114** |
-| `timeout = -1` | 121 | **115** |
-| `portlist[]` | 123 | **117** |
-| walidacja wykluczalności flag | 452–480 | **425–456** |
-| `hints` dla `getaddrinfo` | 497–507 | **471–479** |
-| pętla `POLLERR\|POLLNVAL` | 1161 | **1167** |
-| `STDIN`: `POLLHUP` bez `POLLIN` | 1166 | **1173–1176** |
-| `NETIN`: `POLLHUP` bez `POLLIN` | 1171 | **1178–1181** |
-| `NETOUT`: `POLLHUP` | 1176 | **1183–1187** |
-| kaskada `NETOUT` → `STDIN` | 1184 | **1192–1193** |
-| kaskada `STDOUT` → `NETIN` | 1186 | **1195–1199** |
-| EOF na net in (`ret == 0`) | 1248 | **1252–1255** |
-| limit `-W` | 1252 | **1256–1261** |
-| propagacja EOF | 1290–1301 | **1292–1300** |
-| `SO_REUSEPORT` | 1072 | **1063** |
-| `listen(s, 1)` | 1091 | **1080** |
-| wymuszenie `AF_INET` | 1050–1053 | **1052–1053** |
-| `pledge`/`unveil` | 367–443 | **367–423** |
-| `-V` (rtable) | 118, 349–351 | **98, 352–354** |
-
-Dwie rozbieżności nie są numerami linii, ale trafiają do kodu:
+Nie są to numery linii, ale trafiają wprost do implementacji:
 
 * **Kolejność w `set_common_sockopts()`** `[1583-1636]` to `-S`, `-D`, `-T`,
-  `-I`, `-O`, `-M`, `-m` — a nie `-D -T -I -O -M -m -S`, jak podaje
-  `GROUND_TRUTH.md` §1. Dla pyncat ma to znaczenie, bo kolejność `setsockopt()`
-  jest widoczna w `strace` i testy porównawcze ją sprawdzają.
-* **Granice funkcji** w `GROUND_TRUTH.md` §1 są o 1–6 wierszy za szerokie
-  (`readwrite()` 1104–**1303** vs faktyczne 1104–**1302**, `fillbuf()`
-  1337–**1367** vs **1362**, `build_ports()` 1480–**1532** vs **1526**,
-  `timeout_connect()` 1006–**1037** vs **1031**). Dlatego `readwrite()` ma
-  **199**, a nie 200 linii. Jedyny wyjątek w drugą stronę: `main()` podane jako
-  152–**730** kończy się faktycznie w **739** — tam, gdzie jest `return ret`,
-  czyli dokładnie w miejscu, które §3.3 cytuje jako `[738]`.
+  `-I`, `-O`, `-M`, `-m` — czyli NIE taka, jak sugeruje kolejność flag
+  w `usage`. Ma to znaczenie, bo kolejność `setsockopt()` jest widoczna
+  w `strace`, a testy porównawcze obu implementacji ją sprawdzają.
+* **Granice funkcji liczone „od nagłówka do nagłówka" są o kilka wierszy za
+  szerokie**, bo między funkcjami stoją komentarze blokowe. `readwrite()` to
+  1104–**1302**, a nie 1104–1303 (czyli **199** linii, nie 200); `fillbuf()`
+  1337–**1362**; `build_ports()` 1480–**1526**; `timeout_connect()`
+  1006–**1031**. Wyjątek w drugą stronę: `main()` kończy się w **739**,
+  tam gdzie jest `return ret` — miejsce cytowane w §3.3 jako `[738]`.
+
+Praktyczny wniosek dla kogoś, kto chce zweryfikować te odwołania: licz
+`grep`-em po treści, nie przez odejmowanie numerów z indeksu funkcji.
+Przesunięcia nie są stałe ani jednokierunkowe — w tym pliku sięgają od
+2 wierszy w jedną stronę do 27 w drugą, więc żadna pojedyncza poprawka
+nie uzgodni wszystkiego naraz.
 
 ---
 
@@ -664,7 +637,7 @@ dowodem na `num = BUFSIZE - *bufpos` `[1339]`: żądanie ma rozmiar 16375, bo
 
 Integralność: `sha256` wejścia == wyjścia, 1 048 585 B == 1 048 585 B. Samej
 sumy nie podajemy jako stałej — payload to `/dev/urandom`, więc każdy przebieg
-ma inny digest (`GROUND_TRUTH.md` §11 ma digest z innego przebiegu tego samego
+ma inny digest (docs/c-vs-python.md §1 ma digest z innego przebiegu tego samego
 testu). Reprodukowalne jest **równanie**, nie liczba.
 
 Czyli na loopbacku z domyślnymi buforami częściowych zapisów **nie ma wcale** —

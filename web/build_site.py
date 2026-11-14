@@ -87,17 +87,17 @@ STATIC_FILES = ("index.html", "app.js")
 
 #: Oczekiwane wyniki scenariuszy — kontrakt sprawdzany przez ``--selftest``.
 #: Wartości pochodzą z POMIARÓW na ``/usr/bin/nc`` (OpenBSD netcat, Debian
-#: patchlevel 1.226), spisanych w GROUND_TRUTH; sekcje w komentarzach.
+#: patchlevel 1.226), spisanych w docs/tablice-decyzyjne.md; sekcje w komentarzach.
 EXPECTED = {
-    # GROUND_TRUTH §2.6: bez -N klient wisiał 7,701 s do zabicia
+    # docs/tablice-decyzyjne.md §1: bez -N klient wisiał 7,701 s do zabicia
     "halfclose-bez-N": {"outcome": "deadlock", "stdout_len": 0, "net_tx_len": 4},
-    # GROUND_TRUTH §2.6: z -N wyszedł po 0,008 s
+    # docs/tablice-decyzyjne.md §1: z -N wyszedł po 0,008 s
     "halfclose-z-N": {"outcome": "return", "net_tx_len": 4},
-    # GROUND_TRUTH §2.5: klient -W 2 odebrał dokładnie AB
+    # docs/tablice-decyzyjne.md §9.3: klient -W 2 odebrał dokładnie AB
     "W-limit": {"outcome": "return", "stdout": b"AB"},
-    # GROUND_TRUTH §8: -q 2 → 2,007 s, DELAYED dolatuje
+    # docs/tablice-decyzyjne.md §9.4: -q 2 → 2,007 s, DELAYED dolatuje
     "q-timer": {"outcome": "return", "stdout": b"DELAYED"},
-    # GROUND_TRUTH §8: -q 0 → 0,007 s, DELAYED przepada
+    # docs/tablice-decyzyjne.md §9.4: -q 0 → 0,007 s, DELAYED przepada
     "q-zero": {"outcome": "return", "stdout": b""},
     "transfer": {"outcome": "return", "net_tx_len": 18},
     "eof-z-sieci": {"outcome": "return", "stdout": b"banner\r\n"},
@@ -194,7 +194,7 @@ def selftest() -> int:
     port_cases = [
         ("22", 1, None),
         ("20-25", 6, None),
-        ("25-20", 6, None),  # GROUND_TRUTH §6: swap lo/hi
+        ("25-20", 6, None),  # docs/tablice-decyzyjne.md §8: swap lo/hi
         ("ssh", 1, None),  # ścieżka getservbyname
         ("http-alt", 1, None),  # minus w nazwie usługi ≠ zakres
         ("80,443", None, "unknown"),  # przecinki to błąd, nie lista portów
