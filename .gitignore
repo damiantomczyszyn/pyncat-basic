@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Binarki wersji C (budowane przez `make -C c_reference`)
+c_reference/pyncat_ref
+c_reference/pyncat_ref_debug
+c_reference/pyncat_ref_asan
+c_reference/pyncat_ref_bs*
+
+# Wyniki benchmarków i artefakty CI
+bench*.json
+*.bin
+
+# Strona demo składana przez web/build_site.py
+web/dist/
+
+# UWAGA: .gitignore celowo NIE zawiera '*.json' ani '*.yml' — wycięłoby
+# konfiguracje (.github/workflows/*.yml, web/package.json). Zamiast wzorców
+# po rozszerzeniu wymieniamy konkretne artefakty.
+
+# Zależności testu strony demo (web/test_page.mjs)
+node_modules/
+_preview/

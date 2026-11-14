@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyncat-basic"
+version = "0.1.0"
+description = "OpenBSD netcat przepisany z C na Pythona — projekt edukacyjny"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Arhelyd" }]
+keywords = ["netcat", "nc", "tcp", "udp", "poll", "networking", "education"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: System :: Networking",
+]
+# Bez zależności. Cała biblioteka standardowa, nic więcej — pilnuje tego
+# tests/test_e2e.py::test_brak_zaleznosci_zewnetrznych.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/damiantomczyszyn/pyncat-basic"
+Source = "https://github.com/damiantomczyszyn/pyncat-basic"
+
+[project.scripts]
+pyncat = "pyncat.app:main"
+
+[tool.setuptools]
+packages = ["pyncat"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Testy sieciowe potrafią wisieć, jeśli coś pójdzie nie tak z synchronizacją.
+# Lepiej dostać twardą porażkę niż zawieszony job w CI.
+addopts = "-ra --strict-markers"
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "RUF",  # ruff
+]
+ignore = [
+    # Nazwy pól w Options są utrzymane 1:1 z nazwami zmiennych globalnych
+    # w netcat.c (Nflag, nie shutdown_after_eof), żeby kod dał się czytać
+    # obok oryginału. To świadome odstępstwo od PEP 8, opisane w cli.py.
+    "N815",
+    # `assert` w kodzie produkcyjnym: używamy go wyłącznie jako zawężenia
+    # typu dla mypy po walidacji, nigdy jako walidacji danych wejściowych.
+    "S101",
+    # RUF001/002/003 — „ambiguous unicode character". Cała dokumentacja
+    # i wszystkie komentarze w tym projekcie są po polsku i używają
+    # polskich cudzysłowów („…"), półpauzy (—) i znaków diakrytycznych.
+    # Dla tej reguły to wygląda jak próba przemycenia homoglifu; tutaj to
+    # po prostu polski. Wyłączone świadomie, nie z lenistwa.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # SIM105 — „użyj contextlib.suppress zamiast try/except/pass".
+    # POMIAR (CPython 3.13, 2 mln wywołań): try/except/pass 26,8 ns,
+    # contextlib.suppress 328,7 ns — 12,3x drożej, bo każde wejście tworzy
+    # obiekt context managera. `_shutdown()` w relay.py jest wołane z pętli
+    # relay, więc to nie jest pytanie akademickie. Reguła wyłączona z powodu,
+    # a nie z lenistwa; w kodzie testów trzymamy ten sam styl dla spójności.
+    "SIM105",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Testy: długie docstringi z numerami linii i tabelami bywają szerokie,
+# a `assert` to ich cała treść.
+"tests/*" = ["E501", "B011", "S101"]
+# bench.py buduje polecenia dynamicznie i drukuje raport — tu długie linie
+# f-stringów są czytelniejsze niż sztuczne łamanie.
+"ci/bench.py" = ["E501"]
+# To samo w skryptach demo: raporty i generowany JS/HTML.
+"web/*" = ["E501"]

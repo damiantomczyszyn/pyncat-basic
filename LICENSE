@@ -19,3 +19,85 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+NOTE ON OpenBSD netcat / POCHODZENIE KODU
+
+This project is an independent, from-scratch reimplementation written for
+educational purposes. Below is exactly what came from where.
+
+WHAT IS ORIGINAL TO THIS REPOSITORY (covered by the MIT license above)
+
+  * All source code, in both languages:
+      - pyncat/*.py            (Python package, ~855 lines of code)
+      - c_reference/pyncat_ref.c (C11 reference implementation, ~859 lines)
+      - tests/*.py, ci/*, web/*
+    Every line was written for this project. The C file in particular is NOT
+    a copy, a translation, or a reformatting of netcat.c -- it was written
+    from scratch against the same specification, which is why its function
+    bodies, error handling, helper functions (nc_strtonum, port_strdup,
+    free_ports, set_deadline, ms_left) and comments have no counterpart in
+    the original.
+  * All documentation in docs/ and README.md.
+  * All empirical measurements: throughput, startup overhead, syscall counts,
+    RSS, the BUFSIZE sweep, and the behavioural tables. These were produced by
+    running the code on the authors' machine, not taken from any other source.
+
+WHAT WAS REPRODUCED FROM ANALYSIS OF netcat.c (not copied)
+
+  * Algorithms and semantics:
+      - the four-slot pollfd model of readwrite(), in which POLL_NETOUT and
+        POLL_NETIN are two entries over the same descriptor;
+      - the three loop-exit conditions and the EOF propagation rules;
+      - the POLLHUP-with-POLLIN rule for not closing an input that still has
+        buffered data;
+      - the backpressure pattern in fillbuf()/drainbuf();
+      - the exit-code decision table, including the "once zero, always zero"
+        behaviour of the port loop;
+      - the four-write mechanism of udptest();
+      - the three listen-mode variants for TCP, UDP, and UDP with -k.
+  * Constants: BUFSIZE 16384, PORT_MAX 65535, the POLL_* slot indices,
+    listen() backlog of 1, the 2048-byte MSG_PEEK buffer.
+  * Flag semantics and the wording of a small number of diagnostic strings
+    that are part of the reproduced behaviour ("port number too large",
+    "service \"%s\" unknown", and the strtonum(3) error words "invalid",
+    "too small", "too large").
+
+  These are documented throughout the source with references to the
+  originating function names and line numbers in
+  $OpenBSD: netcat.c,v 1.241 2026/10/31 03:42:10 tb Exp $
+  and collected in docs/netcat-architecture.md.
+
+WHAT IS NOT HERE
+
+  No source code from netcat has been copied into this repository, and the
+  file netcat.c itself is not redistributed here. docs/netcat-architecture.md
+  explains how to fetch it from upstream in order to verify any of the line
+  references.
+
+UPSTREAM LICENSING
+
+  OpenBSD's nc(1) (usr.bin/nc/netcat.c) is distributed under a 3-clause BSD
+  license:
+      Copyright (c) 2001 Eric Jackson <ericj@monkey.org>
+      Copyright (c) 2015 Bob Beck.  All rights reserved.
+  The original netcat (1.10, 1996) was written by *Hobbit*
+  <hobbit@avian.org> and released into the public domain.
+
+  The -q flag reproduced here does not exist in OpenBSD upstream; it comes
+  from the Debian netcat-openbsd package's patch set. Its semantics were
+  established by measuring the installed binary (netcat-openbsd
+  1.226-1ubuntu2), because the patch source was not reachable from the
+  build environment -- see docs/tablice-decyzyjne.md section 9.4.
+
+  This project is not affiliated with, nor endorsed by, the OpenBSD project
+  or the Debian netcat-openbsd maintainers.
+
+THIRD-PARTY TEST AND DEMO DEPENDENCIES
+
+  Not vendored; fetched at build/test time and each covered by its own
+  license: pytest and ruff (MIT), jsdom (MIT), Pyodide (MPL-2.0). The demo
+  page loads Pyodide from a CDN at runtime. The container images used by the
+  network test (nginx, redis, python:alpine) are pulled from Docker Hub by CI
+  and are not part of this repository.
