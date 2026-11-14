@@ -17,9 +17,13 @@ rev. 1.241, nie przepisane z notatek — tabela sprostowań wobec `GROUND_TRUTH.
 jest w §2.4.
 
 > **Licencja.** `netcat.c` jest na licencji BSD 3-clause (Eric Jackson 2001,
-> Bob Beck 2015). W tym repo **nie ma ani jednej linii skopiowanej z netcata**.
-> Odtwarzamy algorytmy i semantykę; warunki podane są tu jako przeformułowany
-> pseudokod z odwołaniem do numeru linii, nigdy jako dosłowny cytat.
+> Bob Beck 2015). W tym repo **nie ma ani jednej linii kodu skopiowanej
+> z netcata**. Odtwarzamy algorytmy i semantykę; warunki są podane jako
+> przeformułowany pseudokod z własnymi nazwami (`STDIN.fd`, `sbuf`) i odwołaniem
+> do numeru linii. Wyjątkiem są **krótkie, oznaczone cytaty blokowe**: jeden
+> komentarz autora przy `-i` (§4.4) i zdania z `nc.1` w §6 — cytowane jako
+> cytaty, z atrybucją, bo w tych miejscach przedmiotem analizy jest właśnie
+> brzmienie tekstu. Kodu C nie cytujemy nigdzie.
 >
 > **Metoda.** Każda liczba pochodzi z pomiaru wykonanego na `/usr/bin/nc` w tym
 > kontenerze — `strace`, `date +%s.%N`, sumy kontrolne. Zestawienie: §8.
@@ -88,8 +92,9 @@ oddaliby tej litery warstwie TLS.
 | 117 | `char *portlist[PORT_MAX+1];` | lista portów jako stringi, zakończona `NULL` |
 | 122–149 | prototypy | |
 
-`BUFSIZE = 16384` potwierdzone empirycznie — `strace` pokazuje
-`read(0, "hi", 16384)` i `read(4, "hello", 16384)` (§8, POMIAR 12).
+`BUFSIZE = 16384` potwierdzone empirycznie — `strace` klienta pokazuje
+`read(0, "hi", 16384)`, a `strace` serwera `read(4, "hello", 16384)` na
+deskryptorze z `accept4()` (pełne przebiegi w §4.1 i §4.6).
 
 ### 2.2 Funkcje — role
 
@@ -174,23 +179,71 @@ przesunięć o kilka wierszy):
 | `ret = 1` (inicjalizacja) / `signal(SIGPIPE, SIG_IGN)` | 168 / 174 |
 | `getopt()` / łańcuch opcji | 176 / 177 |
 | walidacja wzajemnej wykluczalności flag | 425–456 |
-| `hints.ai_socktype` / `AI_NUMERICHOST` | 475 / 477–479 |
+| `hints.ai_socktype` / `AI_NUMERICHOST` | 475 / 477–478 |
 | `if (lflag)` / `ret = 0` (listen) | 561 / 562 |
-| trzy tryby pętli listen: UDP+`-k` / UDP / TCP | 588–598 / 599–628 / 629–651 |
+| trzy tryby pętli listen: UDP+`-k` / UDP / TCP | 588–598 / 599–628 / 629–653 |
 | `build_ports(uport)` / pętla po portach / `ret = 0` (klient) | 677 / 680 / 704 |
 | `remote_connect()` / `timeout_connect()` / `local_listen()` | 930 / 1006 / 1039 |
 | `SO_REUSEPORT` / `listen(s, 1)` | 1063 / 1080 |
 | **`readwrite()`** / `pfd[4]` | **1104** / 1106 |
 | trzy warunki wyjścia | 1137–1140 / 1141–1143 / 1144–1147 |
 | `sleep(iflag)` / `poll(pfd, 4, timeout)` | 1153 / 1156 |
-| pętla `POLLERR\|POLLNVAL` / blok `revents` | 1166–1171 / 1166–1199 |
-| cztery bloki I/O | 1201–1289 |
-| EOF na net in / limit `-W` | 1251–1255 / 1256–1261 |
-| **propagacja EOF** | **1291–1300** |
+| pętla `POLLERR\|POLLNVAL` / blok `revents` | 1167–1171 / 1167–1199 |
+| cztery bloki I/O | 1202–1289 |
+| EOF na net in / limit `-W` | 1252–1255 / 1256–1261 |
+| **propagacja EOF** | **1292–1300** |
 | `drainbuf()` / `memmove` / `fillbuf()` | 1305 / 1331 / 1337 |
 | `strtoport()` / `build_ports()` / warunek zakresu | 1455 / 1480 / 1486 |
 | `udptest()` / cztery zapisy | 1534 / 1542 |
 | `connection_info()` / `report_sock()` | 1552 / 1807 |
+
+#### Sprostowania wobec `GROUND_TRUTH.md`
+
+`GROUND_TRUTH.md` §1 i §2 podają część numerów z przesunięciem. **Przesunięcie
+nie jest stałe ani jednokierunkowe** — od 2 wierszy za mało (`BUFSIZE`) przez
+4–9 za mało w `readwrite()` do 26–27 za dużo przy walidacji flag i `hints`. Nie
+da się więc dodać jednej poprawki do wszystkiego; każde odwołanie trzeba
+sprawdzić osobno. **Obowiązuje kolumna „rev. 1.241"**; tabele powyżej są
+sprawdzone `grep`-em po treści. Pozycje, które pyncat cytuje w komentarzach:
+
+| Element | `GROUND_TRUTH.md` | rev. 1.241 (poprawnie) |
+|---|---|---|
+| `PORT_MAX` | 60 | **62** |
+| `POLL_STDIN`…`POLL_STDOUT` | 62–66 | **65–68** |
+| `BUFSIZE` | 67 | **69** |
+| `recvcount, recvlimit` | 120 | **114** |
+| `timeout = -1` | 121 | **115** |
+| `portlist[]` | 123 | **117** |
+| walidacja wykluczalności flag | 452–480 | **425–456** |
+| `hints` dla `getaddrinfo` | 497–507 | **471–479** |
+| pętla `POLLERR\|POLLNVAL` | 1161 | **1167** |
+| `STDIN`: `POLLHUP` bez `POLLIN` | 1166 | **1173–1176** |
+| `NETIN`: `POLLHUP` bez `POLLIN` | 1171 | **1178–1181** |
+| `NETOUT`: `POLLHUP` | 1176 | **1183–1187** |
+| kaskada `NETOUT` → `STDIN` | 1184 | **1192–1193** |
+| kaskada `STDOUT` → `NETIN` | 1186 | **1195–1199** |
+| EOF na net in (`ret == 0`) | 1248 | **1252–1255** |
+| limit `-W` | 1252 | **1256–1261** |
+| propagacja EOF | 1290–1301 | **1292–1300** |
+| `SO_REUSEPORT` | 1072 | **1063** |
+| `listen(s, 1)` | 1091 | **1080** |
+| wymuszenie `AF_INET` | 1050–1053 | **1052–1053** |
+| `pledge`/`unveil` | 367–443 | **367–423** |
+| `-V` (rtable) | 118, 349–351 | **98, 352–354** |
+
+Dwie rozbieżności nie są numerami linii, ale trafiają do kodu:
+
+* **Kolejność w `set_common_sockopts()`** `[1583-1636]` to `-S`, `-D`, `-T`,
+  `-I`, `-O`, `-M`, `-m` — a nie `-D -T -I -O -M -m -S`, jak podaje
+  `GROUND_TRUTH.md` §1. Dla pyncat ma to znaczenie, bo kolejność `setsockopt()`
+  jest widoczna w `strace` i testy porównawcze ją sprawdzają.
+* **Granice funkcji** w `GROUND_TRUTH.md` §1 są o 1–6 wierszy za szerokie
+  (`readwrite()` 1104–**1303** vs faktyczne 1104–**1302**, `fillbuf()`
+  1337–**1367** vs **1362**, `build_ports()` 1480–**1532** vs **1526**,
+  `timeout_connect()` 1006–**1037** vs **1031**). Dlatego `readwrite()` ma
+  **199**, a nie 200 linii. Jedyny wyjątek w drugą stronę: `main()` podane jako
+  152–**730** kończy się faktycznie w **739** — tam, gdzie jest `return ret`,
+  czyli dokładnie w miejscu, które §3.3 cytuje jako `[738]`.
 
 ---
 
@@ -198,7 +251,7 @@ przesunięć o kilka wierszy):
 
 ### 3.1 Szkielet i rozwidlenie
 
-```
+```text
   main() [152]: getopt [176-348] -> host/uport [356-365] -> pledge [367-423]
                 -> walidacja flag [425-456] -> hints [471-479]
     |
@@ -210,7 +263,7 @@ przesunięć o kilka wierszy):
 
 ### 3.2 Klient TCP, jeden port
 
-```
+```text
   build_ports("1234") [677]  ->  portlist[0]="1234", portlist[1]=NULL
   petla po portlist [680]
     |
@@ -249,7 +302,16 @@ z minusem nie jest brana za zakres.
 | przecinki **nie** są obsługiwane | 1486 (brak gałęzi) | `35101,35099` → `nc: port number invalid: 35101,35099` |
 | nazwa usługi | 1469–1471 | `ssh` → port **22** |
 | nieznana usługa | 1469–1470 | `nosuchsvc` → `nc: port number invalid: nosuchsvc` |
-| poza zakresem | 1464 | `0` → `nc: port number too small: 0`; `65536` → `nc: port number too large: 65536` |
+| poza zakresem | 1464, komunikat 1467–1468 | `0` → `nc: port number too small: 0`; `65536` → `nc: port number too large: 65536` |
+
+> **Uwaga: dwa dolne-środkowe wiersze mieszają źródła.** Komunikaty w kolumnie
+> POMIAR są **debianowe**. Upstream rev. 1.241 w `[1469-1470]` drukuje
+> `service "%s" unknown`, więc `nosuchsvc` dałby tam `nc: service "nosuchsvc"
+> unknown`, a nie `port number invalid`. Ścieżka kodu jest ta sama (`strtonum`
+> z `errno == EINVAL` → `getservbyname` → `NULL`), różni się tylko tekst. Dla
+> pyncat przyjmujemy brzmienie **debianowe**, bo testy porównawcze uruchamiają
+> binarium z kontenera. Komunikaty „too small"/„too large" `[1467-1468]` są
+> w obu wersjach identyczne.
 
 Pętla `[netcat.c:680-730]` leci po całej liście; **po każdym porcie poprzedni
 socket jest zamykany** `[681-682]`. Nie ma równoległości — netcat to nie nmap.
@@ -288,7 +350,7 @@ a kod wyjścia był inny — zależnie od tego, czy porażka wypadła **po** suk
 
 ### 3.4 Serwer TCP
 
-```
+```text
   ret = 0 [562]                      <<< serwer konczy z 0 nawet bez polaczen
   for (;;) [580]
     |
@@ -340,7 +402,7 @@ na BSD. To świadome odstępstwo.
 
 Pętla `[netcat.c:580-657]` ma trzy gałęzie i **UDP obsadza dwie z nich**:
 
-```
+```text
   for (;;) [580]
     |
     +-- uflag && kflag   -> TRYB A [588-598]
@@ -388,7 +450,7 @@ przepadają**. Implementacja ze zwykłym `recvfrom()` gubiłaby pierwszy datagra
 
 ### 4.1 Model czterech slotów
 
-```
+```text
   stdin (fd 0) ---> [0] POLL_STDIN   events=POLLIN  --+
                                                       |  fillbuf()
                                                       v
@@ -413,7 +475,7 @@ dodatkowych zmiennych stanu — tablica `pfd[4]` **jest** maszyną stanową.
 
 **POMIAR** — `strace` klienta, pierwsze wywołanie `poll()`:
 
-```
+```text
   poll([{fd=0, events=POLLIN}, {fd=3, events=0},
         {fd=3, events=POLLIN}, {fd=1, events=0}], 4, -1)
 ```
@@ -439,7 +501,7 @@ Sloty wyjściowe startują z `events = 0`, bo **nie ma jeszcze czego wysyłać**
 
 **POMIAR `-d`** — `strace` klienta `nc -d`, pierwszy `poll()`:
 
-```
+```text
   poll([{fd=-1}, {fd=3, events=0}, {fd=3, events=POLLIN}, {fd=1, events=0}], 4, -1)
 ```
 
@@ -503,7 +565,7 @@ slot na samo `POLLHUP`, gubi ogon strumienia.
 
 **POMIAR** — `strace` klienta `printf 'hi' | nc -N`, stdin to pipe z natychmiastowym EOF:
 
-```
+```text
   poll([{fd=0, events=POLLIN}, ...], 4, -1) = 1 ([{fd=0, revents=POLLIN|POLLHUP}])
   read(0, "hi", 16384)                    = 2          <<< slot ZYJE, dane odczytane
   poll([{fd=0, events=POLLIN}, ...], 4, -1) = 2 ([{fd=0, revents=POLLHUP}, ...])
@@ -527,6 +589,12 @@ reakcja na wartość zwróconą, przełączenie zainteresowania.
 | `stdinbuf` → net | 1219–1237 | `NETOUT.revents & POLLOUT && sbuf > 0` | `drainbuf(NETOUT.fd, stdinbuf, &sbuf, tls)` |
 | net → `netinbuf` | 1239–1272 | `NETIN.revents & POLLIN && nbuf < BUFSIZE` | `fillbuf(NETIN.fd, netinbuf, &nbuf, tls)` |
 | `netinbuf` → stdout | 1274–1289 | `STDOUT.revents & POLLOUT && nbuf > 0` | `drainbuf(STDOUT.fd, netinbuf, &nbuf, NULL)` |
+
+Szkielety nie są w pełni symetryczne: **tylko** dwa bloki sieciowe mają po
+`ret == -1` dodatkowe `return` z całego `readwrite()`, gdy `tls_ctx != NULL &&
+kflag` `[1228-1229]` i `[1248-1249]`. Bez TLS ta gałąź jest martwa, ale to ona
+tłumaczy, dlaczego bloki 2 i 3 wyglądają inaczej niż 1 i 4. W pyncat jej nie
+odwzorowujemy — nie ma `tls_ctx`.
 
 Wzorzec przełączania zainteresowania — **to jest backpressure**:
 
@@ -553,9 +621,18 @@ i odbiorcą, który nie czyta stdout przez 8 s:
 | pozostałe | `16384→2048`, `16384→1024`, `13321→3072`, `10249→3072`, `7177→3072`, `4105→3072`, `1033→1033` |
 | suma zapisanych bajtów | 1 048 585 — zgadza się z rozmiarem wejścia |
 
+Ogon domyka się arytmetycznie: `13321 − 4 × 3072 = 1033`, a
+`336 × 3072 + 2048 + 1024 + 4 × 3072 + 1033 = 1 048 585`. **Dokładna liczba
+zapisów zależy od przebiegu** — ile jądro przyjmie w pierwszych zapisach, zanim
+bufor odbiorcy się zapcha. Powtórzenie tego samego scenariusza dało **342**
+zapisy, **341** częściowych, ten sam dominujący wzorzec `16384 → 3072` **336
+razy** i inny ogon (`14345 → 3072 … 2057 → 2057`, bo `14345 − 4 × 3072 = 2057`).
+Reprodukowalne jest: liczba 3072-bajtowych zapisów, udział częściowych bliski
+100 % i suma bajtów — nie całkowita liczba `write()`.
+
 Fragment `strace` z widocznym przełączaniem zainteresowania:
 
-```
+```text
   poll([{fd=0, events=0},      {fd=3, events=POLLOUT}, ...])   <<< stdin WYLACZONY: bufor pelny
   write(3, ..., 16384)                    = 3072               <<< czesciowy zapis
   poll([{fd=0, events=POLLIN}, {fd=3, events=POLLOUT}, ...])   <<< stdin WLACZONY: zwolnilo sie 3072 B
@@ -570,11 +647,25 @@ uchwycone na gorąco. `read(0, …, 3072)` po zapisaniu 3072 z 16384 to dowód n
 `num = BUFSIZE - *bufpos` z `fillbuf` `[1339]` **oraz** na `memmove` z `drainbuf`
 `[1331]`: bufor pozostaje wypełniony do 13312 B i jest dopełniany o 3072 B.
 
-Dla kontrastu, ten sam 1 MiB **bez** wymuszania małych buforów: **64** ×
-`read(0, …, 16384) = 16384`, raz `read(0, …, 16375)` (ogon 9 B: 16384 − 9), i 65
-zapisów — **wszystkie pełne**. Integralność: `sha256` wejścia == wyjścia ==
-`777f35bf9e9de89647f68cb66ace02eb62d2ca1266bb1ddde72609d910d0de30`,
-1 048 585 B == 1 048 585 B.
+Dla kontrastu, ten sam 1 MiB **bez** wymuszania małych buforów — pełny rozkład
+odczytów i zapisów klienta (66 odczytów, 65 zapisów):
+
+| Wywołanie | Razy |
+|---|---|
+| `read(0, …, 16384) = 16384` | **64** |
+| `read(0, …, 16384) = 9` | 1 — ogon 9 B |
+| `read(0, …, 16375) = 0` | 1 — **EOF**, nie dane; 16375 = 16384 − 9, bo `bufpos` wynosił jeszcze 9 |
+| `write(3, …, 16384) = 16384` | **64** |
+| `write(3, …, 9) = 9` | 1 |
+
+Zapisów częściowych: **0 na 65**. Ostatni `read` jest tu drugim, niezależnym
+dowodem na `num = BUFSIZE - *bufpos` `[1339]`: żądanie ma rozmiar 16375, bo
+9 bajtów ogona wciąż siedziało w buforze, gdy jądro zgłosiło EOF.
+
+Integralność: `sha256` wejścia == wyjścia, 1 048 585 B == 1 048 585 B. Samej
+sumy nie podajemy jako stałej — payload to `/dev/urandom`, więc każdy przebieg
+ma inny digest (`GROUND_TRUTH.md` §11 ma digest z innego przebiegu tego samego
+testu). Reprodukowalne jest **równanie**, nie liczba.
 
 Czyli na loopbacku z domyślnymi buforami częściowych zapisów **nie ma wcale** —
 test, który ich nie wymusza, nie testuje `memmove`.
@@ -636,7 +727,7 @@ skończyło.
 
 Łańcuch z `-N`, krok po kroku:
 
-```
+```text
   klient: write(3,"hi",2); shutdown(3, SHUT_WR)       [1294]
      |
      v
@@ -658,14 +749,14 @@ CLIENT/SERVER MODEL `[nc.1:428]` też. Bez `-N` transfer pliku nigdy się nie ko
 
 ### 4.10 Diagram przejść stanu
 
-```
+```text
                         START [1116-1134]
           STDIN=0  NETOUT=net  NETIN=net  STDOUT=1
                             |
    +------------------------+------------------------+
    |                                                 |
    v  EOF/HUP na stdin                               v  EOF/HUP na net in
- [1176] lub [1210] lub [1260](-W)               [1181] lub [1254] lub [1260](-W)
+ [1176] lub [1210] lub [1260](-W)               [1181] lub [1254] lub [1259](-W)
    STDIN.fd = -1                                   NETIN.fd = -1
    |                                                 |
    | sbuf == 0 ? [1292]                              | nbuf == 0 ? [1298]
@@ -714,7 +805,7 @@ CLIENT/SERVER MODEL `[nc.1:428]` też. Bez `-N` transfer pliku nigdy się nie ko
 
 ### 5.1 `drainbuf()` `[netcat.c:1305-1334]`
 
-```
+```text
   fd == -1                 -> return -1                        [1310-1311]
   n = write(fd, buf, *bufpos)                                   [1321]
   n == -1 && (EAGAIN || EINTR) -> n = TLS_WANT_POLLOUT          [1323-1324]
@@ -727,7 +818,7 @@ CLIENT/SERVER MODEL `[nc.1:428]` też. Bez `-N` transfer pliku nigdy się nie ko
 
 ### 5.2 `fillbuf()` `[netcat.c:1337-1362]`
 
-```
+```text
   num = BUFSIZE - *bufpos                                       [1339]
   fd == -1                 -> return -1                        [1342-1343]
   n = read(fd, buf + *bufpos, num)                              [1353]
@@ -737,7 +828,9 @@ CLIENT/SERVER MODEL `[nc.1:428]` też. Bez `-N` transfer pliku nigdy się nie ko
   return n
 ```
 
-Oba kończą sprawdzeniem `fd == -1` → `return -1`. Slot może zostać wycofany
+Oba **zaczynają** od gardy `fd == -1` → `return -1` (w `fillbuf` zaraz po
+wyliczeniu `num`, `[1342-1343]`; w `drainbuf` jako pierwsza instrukcja,
+`[1310-1311]`). Slot może zostać wycofany
 w kroku kaskadowym `[1192-1199]` **w tej samej iteracji**, w której `poll()`
 zgłosił na nim gotowość; bez tej gardy netcat wołałby `read()`/`write()` na `-1`.
 
@@ -788,7 +881,9 @@ i trzeba go mapować na `TLS_WANT_POLL*`.
 
 ## 6. Rozbieżności między dokumentacją a kodem
 
-Cztery flagi, przy których man page, `nc -h` i kod mówią trzy różne rzeczy.
+Cztery flagi, przy których man page, `nc -h`, kod upstream i zachowanie binarium
+nie są zgodne. Przy `-i`, `-w` i `-W` są to trzy różne twierdzenia o tym samym
+kodzie; przy `-q` kodu upstream **nie ma wcale** (§6.4).
 Wszystkie pomiary na `Debian patchlevel 1.226-1ubuntu2`.
 
 ### 6.1 `-i` — obiecane w dwóch miejscach, jest w jednym, działa w zerowym
@@ -812,12 +907,14 @@ nie wie nic o liniach); między portami nie ma **nic**.
 | `-z`, 3 zamknięte porty | 0,005 s | 0,006 s (`-i 1`), 0,005 s (`-i 2`) |
 | 1 otwarty port, 1 B, `-N` | 0,006 s | 0,005 s (`-i 1`), 0,006 s (`-i 3`) |
 | `-z`, 2 **otwarte** porty w zakresie | 0,005 s | 0,006 s (`-i 2`) |
-| serwer `-l` odbierający 3 porcje po 0,3 s | 1,009 s | 1,009 s (`-i 1`), 1,009 s (`-i 2`) |
-| klient `-N` wysyłający 3 porcje po 0,3 s | 0,607 s | 0,607 s (`-i 2`) |
+| serwer `-l` odbierający 3 porcje, nadawca `A`·0,3 s·`B`·0,3 s·`C`·0,3 s | 0,910 s | 0,910 s (`-i 1`), 0,911 s (`-i 2`) |
+| klient `-N` wysyłający 3 porcje, `A`·0,3 s·`B`·0,3 s·`C` | 0,607 s | 0,607 s (`-i 2`) |
 
-Gdyby `sleep(iflag)` z `[1152-1153]` działał, serwer z `-i 2` odbierający trzy
-porcje potrzebowałby ≥ 6 s; potrzebował 1,009 s, tyle samo co bez flagi.
-**Trzy różne zachowania w trzech miejscach.**
+Dwa dolne wiersze to czysty koszt harmonogramu nadawcy: 3 × 0,3 s = 0,9 s i
+2 × 0,3 s = 0,6 s. Gdyby `sleep(iflag)` z `[1152-1153]` działał, serwer z `-i 2`
+odbierający trzy porcje potrzebowałby ≥ 6 s (sleep przed **każdym** `poll()`);
+potrzebował 0,910 s, tyle samo co bez flagi. **Trzy różne zachowania w trzech
+miejscach.**
 
 **Decyzja dla pyncat:** implementujemy **obie** semantyki obiecane przez man page
 — `sleep` w pętli relay ORAZ przerwę między portami. Świadome odstępstwo od
@@ -926,7 +1023,8 @@ został opróżniony. Do kończenia transferu właściwe jest `-N`, nie `-q 0`.
 | 3 | Upstream `udptest()` robi **4** zapisy bezwarunkowo `[netcat.c:1542-1547]` | **Otwarty** port UDP: dokładnie **4** × `write(3, "X", 1) = 1` ✔. **Zamknięty**: `write = 1`, potem `write = -1 ECONNREFUSED` i proces **wychodzi** — tylko **2** zapisy. Debian przerywa pętlę po porażce. |
 | 4 | Upstream odtwarza listener w każdej iteracji `-k` `[netcat.c:582-584]` | Debian 1.226: **1** × `socket`/`bind`/`listen(3,1)`, **4** × `accept4` na 3 połączenia, `close(4)` po każdym. Listener nie jest odtwarzany. |
 | 5 | Upstream ustawia tylko `SO_REUSEPORT` `[netcat.c:1063]` | Debian ustawia **oba**: `setsockopt(SO_REUSEADDR)` i `setsockopt(SO_REUSEPORT)`. |
-| 6 | Debian `nc -h` wymienia `-b`, `-C`, `-q`, `-Z` (DCCP) | Flag `-b` (broadcast), `-C` (CRLF), `-q`, oraz `-Z` w znaczeniu DCCP **nie ma** w rev. 1.241; `-Z` w upstream to „peer certificate file" `[netcat.c:299-304]`. `-T` w Debianie przyjmuje tylko TOS, bez opcji TLS. |
+| 6 | Debian `nc -h` wymienia `-b`, `-C`, `-q`, `-Z` (DCCP) | Flag `-b` (broadcast), `-C` (CRLF), `-q`, oraz `-Z` w znaczeniu DCCP **nie ma** w rev. 1.241; `-Z` w upstream to „peer certificate file" `[netcat.c:299-304]`. `-T` w Debianie przyjmuje tylko TOS, bez opcji TLS. **POMIAR:** `nc -h` w kontenerze wypisuje `-b Allow broadcast`, `-C Send CRLF as line-ending`, `-q secs quit after EOF on stdin and delay of secs`, `-Z DCCP mode`, `-T keyword TOS value`. Pełna lista 35 flag Command Summary: `-4 -6 -b -C -D -d -F -h -I -i -k -l -M -m -N -n -O -P -p -q -r -S -s -T -t -U -u -V -v -W -w -X -x -Z -z` — brakuje całej rodziny TLS upstream (`-c`, `-e`, `-H`, `-K`, `-o`, `-R`). |
+| 7 | Upstream na nieznaną usługę drukuje `service "%s" unknown` `[netcat.c:1469-1470]` | Debian 1.226 drukuje `nc: port number invalid: %s`. **POMIAR:** `nosuchsvc` i `35101,35099` → `nc: port number invalid: …` w obu przypadkach. Ta sama ścieżka kodu, inny tekst (§3.3). |
 
 ### 6.6 Podsumowanie — komu wierzyć
 
@@ -1000,23 +1098,24 @@ skanowania, transferu plików i jako `ProxyCommand` dla `ssh(1)`
 | Przekierowanie portu / tunel | **`ssh -L` / `ssh -W`**, `nc` jako `ProxyCommand` | Tunel szyfrowany i uwierzytelniony |
 | Testowanie protokołu „ręcznie" | **`nc`** bez `-e` | To dokładnie to, do czego netcat jest |
 
-Jeśli realnym celem jest „spiąć **własny** proces z socketem **lokalnie**", są
-dwie uczciwe drogi:
+Jeśli realnym celem jest „mój proces ma obsługiwać połączenia", to jest cała
+potrzeba, a nie potrzeba flagi w netcacie. Rozwiązuje ją **socket activation**:
+nadzorca (systemd, `inetd`) trzyma listener, przyjmuje połączenie i uruchamia
+proces z własnym uwierzytelnianiem, limitami zasobów, logiem i polityką
+restartu. Alternatywa równie uczciwa: **napisać serwer**. Pętla relay z §4 nie
+jest dużym kodem — `netcat.c:readwrite()` to 199 linii, `pyncat/relay.py` w tym
+repo 517 (327 bez komentarzy i pustych wierszy) — a proces, który sam trzyma
+socket, decyduje też, *kto* i *co* może przez niego zrobić.
 
-* **Para FIFO i własny proces.** `mkfifo` dla obu kierunków, `nc` czyta z jednego
-  i pisze do drugiego, a program po drugiej stronie trzyma własny kod i własne
-  decyzje. Netcat zostaje przy swojej roli; kontrolę nad tym, *co* konsumuje
-  bajty, masz w swoim kodzie, nie w fladze CLI.
-* **`socat`** z adresami `EXEC:`/`SYSTEM:` — jest do tego zrobiony i robi to
-  porządnie. Ale to **ta sama klasa ryzyka co `nc -e`**: brak uwierzytelniania,
-  brak szyfrowania (o ile nie dołożysz `OPENSSL:`), pełne uprawnienia procesu.
-  Jeśli po drugiej stronie stoi listener dostępny z sieci, zbudowałeś backdoor —
-  tylko innym narzędziem. Wyłącznie `127.0.0.1` albo gniazdo uniksowe z prawami
-  plikowymi; nigdy `0.0.0.0`, nigdy jako root.
+Istnieją narzędzia, które potrafią przypiąć dowolny program do socketu i robią
+to świadomie (`socat` jest najbardziej znanym). Nie opisujemy ich konfiguracji,
+bo ryzyko nie zależy od narzędzia: **listener, który uruchamia program, bez
+uwierzytelniania i szyfrowania jest backdoorem niezależnie od tego, czym go
+zbudowano.** To ta sama klasa ryzyka co `nc -e`, tylko pod inną nazwą.
 
 **Rekomendacja:** gdy ktoś sięga po `-e`, w przeważającej większości przypadków
-poprawną odpowiedzią jest `ssh`, a w pozostałych socket activation.
-`socat EXEC:` to narzędzie awaryjne na lokalnym hoście.
+poprawną odpowiedzią jest `ssh`, a w pozostałych socket activation. Trzeciej
+odpowiedzi w tym dokumencie nie ma i nie będzie — §7.5.
 
 ### 7.5 Granica tego projektu
 
@@ -1035,8 +1134,8 @@ gniazda uniksowe (`-U`), `fdpass` (`-F`), emulację telnetu (`-t`), SCTP, oraz
 
 ## 8. Co zostało zmierzone
 
-Wszystko na `/usr/bin/nc` → `/bin/nc.openbsd`,
-`OpenBSD netcat (Debian patchlevel 1.226-1ubuntu2)`, Linux 6.18, loopback.
+Wszystko na `/usr/bin/nc` → `/usr/bin/nc.openbsd` (`readlink -f`),
+`OpenBSD netcat (Debian patchlevel 1.226-1ubuntu2)`, Linux 6.18.44, loopback.
 Każda liczba w tym dokumencie jest podana w sekcji, która jej używa, i oznaczona
 słowem **POMIAR**. Zmierzone grupy: półzamknięcie `-N` (§4.9), `-w` jako idle
 timeout w `-l` (§6.2), `-W` przy odczytach rozdzielonych i scalonych (§4.8),
@@ -1044,8 +1143,14 @@ timeout w `-l` (§6.2), `-W` przy odczytach rozdzielonych i scalonych (§4.8),
 (§6.1), kody wyjścia TCP i UDP (§3.3), parsowanie portów (§3.3), dokładne stringi
 stderr (§3.4), `strace` modelu czterech slotów i `BUFSIZE` (§4.1, §4.2), `POLLHUP`
 z `POLLIN` (§4.6), backpressure wymuszony i domyślny (§4.7), integralność 1 MiB
-(§4.7), tryby serwera UDP i TCP `-k` (§3.4, §3.5) oraz pięć rozbieżności
-Debian ↔ upstream (§6.5).
+(§4.7), tryby serwera UDP i TCP `-k` (§3.4, §3.5), liczba zapisów `udptest()`
+(§6.5) oraz **siedem** rozbieżności Debian ↔ upstream (§6.5).
+
+Pomiary czasowe są powtarzalne z dokładnością do kilku milisekund; tam gdzie
+liczba zależy od przebiegu (łączna liczba `write()` w §4.7, czas życia klienta
+bez `-N`/bez `-q` — ograniczony przez `timeout` harnessu, nie przez netcata),
+jest to w tekście powiedziane wprost. `sha256` losowego payloadu świadomie nie
+jest podawany jako stała (§4.7).
 
 ---
 

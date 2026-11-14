@@ -265,7 +265,7 @@ def parse_args(argv: list[str]) -> Options:
         else:  # pragma: no cover — _OPTSTRING i ta gałąź są spójne
             raise UsageError(f"nieobsłużona opcja {flag}")
 
-    # [netcat.c:477-479] AI_NUMERICHOST przy -n
+    # [netcat.c:477-478] AI_NUMERICHOST przy -n
     if opts.nflag:
         opts.ai_flags |= socket.AI_NUMERICHOST
 

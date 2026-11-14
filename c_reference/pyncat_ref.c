@@ -50,10 +50,22 @@
  *   bez _DEFAULT_SOURCE   -> 9 błędów, m.in. "'NI_MAXHOST' undeclared"
  *                            i "implicit declaration of function 'random'"
  *   bez _POSIX_C_SOURCE   -> 0 błędów
- * Czyli na glibc samo _DEFAULT_SOURCE wystarcza, bo włącza także widoczność
- * POSIX-ową. _POSIX_C_SOURCE zostaje mimo to: jest deklaracją intencji
- * (ten plik ma być POSIX-owy, nie glibc-owy) i jedynym z tych dwóch makr,
- * które cokolwiek znaczy poza glibc. Bez obu plik się nie kompiluje.
+ * Czyli na glibc samo _DEFAULT_SOURCE wystarcza do KOMPILACJI, bo włącza
+ * także widoczność POSIX-ową. _POSIX_C_SOURCE zostaje jednak nie tylko jako
+ * deklaracja intencji - na glibc ma skutek BEHAWIORALNY: wiąże getopt(3)
+ * z wariantem POSIX-owym (__posix_getopt), który NIE permutuje argv.
+ * POMIAR (ta sama linia kompilacji, plik z usuniętą jedną linią #define,
+ * `nm -D --undefined-only` na gotowej binarce):
+ *   z _POSIX_C_SOURCE   -> U __posix_getopt; `pyncat_ref HOST PORT -z -v`
+ *                          kończy się błędem użycia (exit 1), bo -z i -v
+ *                          są już argumentami pozycyjnymi
+ *   bez _POSIX_C_SOURCE -> U getopt (wariant GNU); to samo wywołanie
+ *                          DZIAŁA, bo GNU getopt przestawia flagi na przód
+ * Zostaje wariant POSIX-owy, i to jest świadoma decyzja: dokładnie tak
+ * zachowuje się getopt.getopt() w bliźniaku (pyncat/cli.py), więc oba
+ * programy przyjmują ten sam zbiór wywołań. Odstępstwo od /usr/bin/nc,
+ * które jest linkowane z GNU-owym getopt i `nc HOST PORT -z -v` przyjmuje.
+ * Bez obu makr plik się nie kompiluje (POMIAR: 60 błędów).
  */
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE
@@ -360,12 +372,19 @@ main(int argc, char *argv[])
 	ret = 1;
 
 	/*
-	 * progname jest stale "pyncat", a nie basename(argv[0]). err(3)
-	 * w netcacie bierze nazwę z getprogname(), więc komunikaty zmieniają
-	 * się razem z nazwą pliku. Nam zależy na odwrotnym: binarka nazywa się
-	 * pyncat_ref, bliźniak w Pythonie uruchamia się jako python -m pyncat,
-	 * a komunikaty mają być IDENTYCZNE, żeby testy mogły je porównywać
-	 * dosłownie między obiema implementacjami.
+	 * progname jest stałe ("pyncat_ref"), a nie basename(argv[0]). err(3)
+	 * w netcacie bierze nazwę z getprogname(), więc jego komunikaty zmieniają
+	 * się razem z nazwą pliku; tutaj nie zmieniają się nigdy - ani po
+	 * symlinku, ani po uruchomieniu pełną ścieżką.
+	 * UWAGA, sam PREFIKS nie jest wspólny z bliźniakiem: Python drukuje
+	 * "pyncat: " (PROGNAME w pyncat/constants.py), ten plik "pyncat_ref: ".
+	 * IDENTYCZNA jest treść PO prefiksie i dokładnie tak porównuje ją
+	 * tests/test_parity.py, który obcina oba prefiksy. Jeśli kiedyś ma być
+	 * identyczny także prefiks, zmieniać tutaj (jedna linia: progname),
+	 * nie w teście.
+	 * Jeden komunikat wymyka się tej regule w obu implementacjach:
+	 * "invalid option" drukuje sam getopt(3) i używa argv[0] - tak samo
+	 * jak netcat.
 	 */
 	memset(ipaddr, 0, sizeof(ipaddr));
 	memset(&cliaddr, 0, sizeof(cliaddr));

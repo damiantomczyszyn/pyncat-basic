@@ -63,7 +63,7 @@ class TestFlagi:
         )
 
     def test_n_ustawia_ai_numerichost(self) -> None:
-        """[netcat.c:477-479]"""
+        """[netcat.c:477-478]"""
         assert parse_args(["-n", "h", "1"]).ai_flags & socket.AI_NUMERICHOST
         assert not parse_args(["h", "1"]).ai_flags & socket.AI_NUMERICHOST
 

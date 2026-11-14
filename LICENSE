@@ -71,10 +71,19 @@ WHAT WAS REPRODUCED FROM ANALYSIS OF netcat.c (not copied)
 
 WHAT IS NOT HERE
 
-  No source code from netcat has been copied into this repository, and the
+  No netcat source code has been copied into this repository as code, and the
   file netcat.c itself is not redistributed here. docs/netcat-architecture.md
   explains how to fetch it from upstream in order to verify any of the line
   references.
+
+  To be exact about the one place where upstream text does appear: the
+  architecture document quotes, as marked block quotations with attribution,
+  a single three-line source comment (the author's own note on the -i flag,
+  netcat.c:1149-1151) and a handful of sentences from the nc.1 manual page.
+  They are quoted because in those sections the wording itself is what is
+  being analysed -- the point is precisely that the documentation and the
+  code disagree. No C code is quoted anywhere, and nothing from netcat is
+  compiled into, imported by, or shipped as part of this project.
 
 UPSTREAM LICENSING
 
