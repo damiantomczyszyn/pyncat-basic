@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pyncat-basic — maszyna stanów readwrite()</title>
+<meta name="description" content="Pętla relay z netcata, wykonywana krok po kroku w przeglądarce przez Pyodide. Prawdziwy kod pyncat/relay.py na symulowanym jądrze.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:     #E8EAEF;
+    --pane:      #F5F6F9;
+    --pane-2:    #FBFBFD;
+    --ink:       #16181F;
+    --ink-2:     #596072;
+    --ink-3:     #878DA0;
+    --rule:      #C6CAD4;
+    --rule-soft: #DCDFE7;
+
+    --accent:     #27408F;
+    --accent-dim: #D9DFF1;
+    --alive:      #1B6B40;
+    --alive-dim:  #E3EDE5;
+    --dead:       #94392B;
+    --dead-dim:   #F3E2DE;
+    --idle:       #6A7080;
+    --warn-bg:    #F6EFD9;
+    --warn-ink:   #7A5E0E;
+    --net-tint:   #DEE1F3;
+
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+    --s-2: 0.7rem;
+    --s-1: 0.78rem;
+    --s0:  0.9rem;
+    --s1:  1rem;
+    --s2:  1.3rem;
+    --s3:  1.75rem;
+    --s4:  2.4rem;
+
+    --gap: 1.6rem;
+    --r: 2px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #14161C;
+      --pane:      #1B1E26;
+      --pane-2:    #22252F;
+      --ink:       #E7E9EF;
+      --ink-2:     #A6ACBD;
+      --ink-3:     #7B8294;
+      --rule:      #343947;
+      --rule-soft: #2A2E3A;
+
+      --accent:     #93A9E8;
+      --accent-dim: #26304C;
+      --alive:      #74C79A;
+      --alive-dim:  #1D3127;
+      --dead:       #E39182;
+      --dead-dim:   #39231F;
+      --idle:       #8A91A3;
+      --warn-bg:    #342C14;
+      --warn-ink:   #E2CE8E;
+      --net-tint:   #262B3D;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:     #14161C;
+    --pane:      #1B1E26;
+    --pane-2:    #22252F;
+    --ink:       #E7E9EF;
+    --ink-2:     #A6ACBD;
+    --ink-3:     #7B8294;
+    --rule:      #343947;
+    --rule-soft: #2A2E3A;
+    --accent:     #93A9E8;
+    --accent-dim: #26304C;
+    --alive:      #74C79A;
+    --alive-dim:  #1D3127;
+    --dead:       #E39182;
+    --dead-dim:   #39231F;
+    --idle:       #8A91A3;
+    --warn-bg:    #342C14;
+    --warn-ink:   #E2CE8E;
+    --net-tint:   #262B3D;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--s1);
+    line-height: 1.55;
+  }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  code, kbd, pre, .mono { font-family: var(--mono); }
+
+  /* ---------- nagłówek ---------- */
+
+  .masthead { border-bottom: 1px solid var(--rule); background: var(--pane); }
+  .masthead__inner {
+    max-width: 1180px; margin: 0 auto; padding: 1.4rem 16px 1.1rem;
+    display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
+    justify-content: space-between;
+  }
+  .wordmark { font-size: var(--s3); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .wordmark span { color: var(--ink-3); font-weight: 400; }
+  .tagline { margin: 0.35rem 0 0; color: var(--ink-2); font-size: var(--s0); max-width: 58ch; }
+
+  .env {
+    font-family: var(--mono); font-size: var(--s-2); color: var(--ink-2);
+    border: 1px solid var(--rule-soft); background: var(--pane-2);
+    padding: 0.5rem 0.65rem; border-radius: var(--r); max-width: 42ch;
+  }
+  .env b { color: var(--ink); font-weight: 600; }
+  .env div + div { margin-top: 0.15rem; }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 0 16px 4rem; }
+
+  /* ---------- sekcje ---------- */
+
+  section { margin-top: 2.4rem; }
+  .sec-head { border-bottom: 1px solid var(--rule); padding-bottom: 0.5rem; margin-bottom: 1.1rem; }
+  .sec-head h2 { margin: 0; font-size: var(--s2); font-weight: 600; letter-spacing: -0.01em; }
+  .sec-head p { margin: 0.4rem 0 0; color: var(--ink-2); font-size: var(--s0); max-width: 78ch; }
+
+  .note {
+    background: var(--warn-bg); color: var(--warn-ink);
+    border: 1px solid color-mix(in srgb, var(--warn-ink) 28%, transparent);
+    border-radius: var(--r); padding: 0.9rem 1rem; font-size: var(--s0);
+  }
+  .note h3 { margin: 0 0 0.45rem; font-size: var(--s1); font-weight: 600; }
+  .note ul { margin: 0.45rem 0 0; padding-left: 1.2rem; }
+  .note li + li { margin-top: 0.25rem; }
+  .note code { font-size: 0.92em; }
+
+  /* ---------- boot ---------- */
+
+  #boot { margin-top: 2rem; padding: 1.1rem 1.2rem; background: var(--pane); border: 1px solid var(--rule-soft); border-radius: var(--r); }
+  #boot p { margin: 0 0 0.6rem; color: var(--ink-2); font-size: var(--s0); }
+  #boot ol { margin: 0; padding-left: 1.3rem; font-family: var(--mono); font-size: var(--s-1); color: var(--ink-3); }
+  #boot li[data-done="1"] { color: var(--alive); }
+  #boot li[data-done="1"]::after { content: "  ✓"; }
+  #boot li[data-done="err"] { color: var(--dead); }
+  #boot li[data-done="err"]::after { content: "  ✕"; }
+  .fatal { margin-top: 1rem; border: 1px solid var(--dead); background: var(--dead-dim); color: var(--ink); padding: 1rem; border-radius: var(--r); font-size: var(--s0); }
+  .fatal pre { white-space: pre-wrap; font-size: var(--s-1); margin: 0.5rem 0 0; }
+
+  /* ---------- scenariusze ---------- */
+
+  .scen-grid { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
+  @media (max-width: 900px) { .scen-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .scen-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule-soft); border-radius: var(--r); overflow: hidden; background: var(--pane-2); }
+  .scen-list li + li { border-top: 1px solid var(--rule-soft); }
+  .scen-list button {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    padding: 0.7rem 0.8rem; cursor: pointer; font-family: inherit; font-size: var(--s0);
+    color: var(--ink); line-height: 1.35;
+  }
+  .scen-list button:hover { background: var(--pane); }
+  .scen-list button[aria-current="true"] { background: var(--accent-dim); box-shadow: inset 3px 0 0 var(--accent); }
+  .scen-list .cmd { display: block; font-family: var(--mono); font-size: var(--s-2); color: var(--ink-3); margin-top: 0.2rem; word-break: break-all; }
+
+  .lead { background: var(--pane); border: 1px solid var(--rule-soft); border-radius: var(--r); padding: 0.9rem 1rem; font-size: var(--s0); }
+  .lead .cmdline { font-family: var(--mono); font-size: var(--s-1); color: var(--accent); margin: 0 0 0.5rem; word-break: break-all; }
+  .lead p { margin: 0.5rem 0 0; }
+  .lead .expect { color: var(--ink-2); border-top: 1px dashed var(--rule); padding-top: 0.5rem; margin-top: 0.7rem; }
+  .lead .measured { font-family: var(--mono); font-size: var(--s-2); color: var(--ink-3); }
+
+  /* ---------- slots ---------- */
+
+  .slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; margin-top: 1rem; }
+  @media (max-width: 760px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .slot { border: 1px solid var(--rule); border-radius: var(--r); padding: 0.6rem 0.65rem; background: var(--pane-2); position: relative; }
+  .slot[data-net="1"] { background: var(--net-tint); }
+  .slot[data-state="dead"] { border-color: var(--dead); background: var(--dead-dim); }
+  .slot[data-state="armed"] { border-color: var(--alive); background: var(--alive-dim); }
+  .slot h4 { margin: 0; font-family: var(--mono); font-size: var(--s-1); font-weight: 600; letter-spacing: 0.02em; }
+  .slot[data-state="dead"] h4 { text-decoration: line-through; color: var(--dead); }
+  .slot dl { margin: 0.45rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.5rem; font-family: var(--mono); font-size: var(--s-2); }
+  .slot dt { color: var(--ink-3); }
+  .slot dd { margin: 0; color: var(--ink); }
+  .slot .flags { color: var(--accent); }
+  .slot .rev { color: var(--alive); font-weight: 600; }
+  .slot .zero { color: var(--ink-3); }
+  .slot .samefd { position: absolute; top: -0.55rem; right: 0.4rem; font-size: var(--s-2); font-family: var(--mono); background: var(--paper); color: var(--ink-3); padding: 0 0.3rem; border: 1px solid var(--rule-soft); border-radius: var(--r); }
+
+  /* ---------- bufory i licznik ---------- */
+
+  .meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.6rem; margin-top: 0.8rem; }
+  .meter { border: 1px solid var(--rule-soft); border-radius: var(--r); padding: 0.5rem 0.6rem; background: var(--pane-2); }
+  .meter h5 { margin: 0 0 0.3rem; font-size: var(--s-2); color: var(--ink-3); font-weight: 500; font-family: var(--mono); }
+  .meter .val { font-family: var(--mono); font-size: var(--s1); font-weight: 600; }
+  .meter .bar { height: 4px; background: var(--rule-soft); border-radius: 2px; margin-top: 0.35rem; overflow: hidden; }
+  .meter .bar i { display: block; height: 100%; background: var(--accent); }
+
+  /* ---------- kod ---------- */
+
+  .codeview { margin-top: 1rem; border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+  .codeview header { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: space-between; align-items: baseline; padding: 0.45rem 0.7rem; background: var(--pane); border-bottom: 1px solid var(--rule-soft); font-family: var(--mono); font-size: var(--s-2); color: var(--ink-3); }
+  .codeview header .ncref { color: var(--accent); font-weight: 600; }
+  .codeview pre { margin: 0; padding: 0.7rem; background: var(--pane-2); overflow-x: auto; font-size: var(--s-1); line-height: 1.5; }
+  .codeview .doc { margin: 0; padding: 0.6rem 0.7rem; background: var(--pane); border-top: 1px solid var(--rule-soft); font-size: var(--s-1); color: var(--ink-2); }
+  .codeview .doc p { margin: 0; }
+  .codeview .doc p + p { margin-top: 0.3rem; }
+
+  /* ---------- sterowanie ---------- */
+
+  .controls { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 1rem; }
+  button.ctl, button.ghost {
+    font-family: var(--mono); font-size: var(--s-1); padding: 0.4rem 0.7rem;
+    border: 1px solid var(--rule); background: var(--pane-2); color: var(--ink);
+    border-radius: var(--r); cursor: pointer;
+  }
+  button.ctl[data-primary] { background: var(--accent); border-color: var(--accent); color: var(--paper); font-weight: 600; }
+  button.ctl:hover, button.ghost:hover { border-color: var(--accent); }
+  button.ctl:disabled { opacity: 0.45; cursor: default; border-color: var(--rule-soft); }
+  .controls label { font-size: var(--s-1); color: var(--ink-2); display: inline-flex; align-items: center; gap: 0.3rem; }
+  .controls .pos { font-family: var(--mono); font-size: var(--s-1); color: var(--ink-3); margin-left: auto; }
+  input[type="range"] { width: 110px; }
+  .scrub { width: 100%; margin-top: 0.6rem; }
+
+  /* ---------- log ---------- */
+
+  .log { margin-top: 1rem; border: 1px solid var(--rule-soft); border-radius: var(--r); background: var(--pane-2); max-height: 15rem; overflow-y: auto; }
+  .log ol { margin: 0; padding: 0.5rem 0.7rem 0.5rem 2.2rem; font-family: var(--mono); font-size: var(--s-2); color: var(--ink-2); }
+  .log li { margin: 0.1rem 0; }
+  .log li[data-now="1"] { color: var(--ink); font-weight: 600; }
+  .log .empty { padding: 0.7rem; color: var(--ink-3); font-family: var(--mono); font-size: var(--s-2); }
+
+  .outcome { margin-top: 1rem; border-radius: var(--r); padding: 0.8rem 1rem; font-size: var(--s0); border: 1px solid var(--rule); background: var(--pane); }
+  .outcome[data-kind="deadlock"] { border-color: var(--dead); background: var(--dead-dim); }
+  .outcome[data-kind="return"] { border-color: var(--alive); background: var(--alive-dim); }
+  .outcome[data-kind="exception"] { border-color: var(--dead); background: var(--dead-dim); }
+  .outcome h4 { margin: 0 0 0.3rem; font-size: var(--s1); }
+  .outcome dl { margin: 0.5rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem; font-family: var(--mono); font-size: var(--s-2); }
+  .outcome dt { color: var(--ink-3); }
+  .outcome dd { margin: 0; word-break: break-all; }
+
+  /* ---------- tabele ---------- */
+
+  table { width: 100%; border-collapse: collapse; font-size: var(--s0); }
+  th, td { text-align: left; padding: 0.4rem 0.55rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  th { font-size: var(--s-2); text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3); font-weight: 600; }
+  td.mono, th.mono { font-family: var(--mono); font-size: var(--s-1); }
+  .tbl-wrap { border: 1px solid var(--rule-soft); border-radius: var(--r); overflow-x: auto; background: var(--pane-2); }
+
+  /* ---------- porty ---------- */
+
+  .ports-form { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; margin-bottom: 0.9rem; }
+  .ports-form label { font-size: var(--s-1); color: var(--ink-2); display: block; }
+  .ports-form input[type="text"] { font-family: var(--mono); font-size: var(--s0); padding: 0.4rem 0.5rem; border: 1px solid var(--rule); border-radius: var(--r); background: var(--pane-2); color: var(--ink); min-width: 16rem; }
+  .ports-form .check { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.5rem; }
+  .chip { font-family: var(--mono); font-size: var(--s-2); border: 1px solid var(--rule-soft); background: var(--pane-2); padding: 0.1rem 0.35rem; border-radius: var(--r); }
+  .err { color: var(--dead); font-family: var(--mono); font-size: var(--s-1); }
+  .quick { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.7rem; }
+
+  footer { border-top: 1px solid var(--rule); margin-top: 3.5rem; background: var(--pane); }
+  footer div { max-width: 1180px; margin: 0 auto; padding: 1.4rem 16px 2.4rem; color: var(--ink-2); font-size: var(--s0); }
+  footer ul { padding-left: 1.2rem; }
+  .meta { color: var(--ink-3); font-size: var(--s-1); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead__inner">
+    <div>
+      <h1 class="wordmark">pyncat-basic <span>/ maszyna stanów <code>readwrite()</code></span></h1>
+      <p class="tagline">
+        Pętla relay z netcata, wykonywana krok po kroku. To nie jest animacja
+        ani reimplementacja: strona uruchamia <code>pyncat/relay.py</code>
+        z tego repozytorium przez Pyodide, na symulowanym jądrze, i rejestruje
+        stan tablicy <code>pfd[4]</code> przed każdą linią.
+      </p>
+    </div>
+    <div class="env" id="env" aria-live="polite">środowisko: wczytywanie…</div>
+  </div>
+</header>
+
+<main>
+
+  <div class="note" id="honest">
+    <h3>Czego ta strona NIE robi</h3>
+    <p>
+      Netcat jest narzędziem sieciowym, a przeglądarka <strong>nie ma socketów
+      TCP ani UDP</strong> — ma <code>fetch</code>, WebSocket i WebRTC, każdy
+      z narzuconym protokołem. W Pyodide <code>socket.socketpair()</code>
+      kończy się błędem <code>[Errno 28]</code>, a <code>poll()</code>
+      z timeoutem wraca natychmiast. Dlatego tu <strong>nic się nigdzie nie
+      łączy</strong>.
+    </p>
+    <ul>
+      <li><strong>Prawdziwe</strong> jest: ciało <code>readwrite()</code>,
+          <code>fillbuf()</code>, <code>drainbuf()</code>, wszystkie warunki
+          wyjścia, kolejność obsługi <code>revents</code>, backpressure
+          i propagacja EOF — czyli cała logika decyzyjna.</li>
+      <li><strong>Podstawione</strong> są wyłącznie wywołania systemowe:
+          <code>poll()</code>, <code>read()</code>, <code>write()</code>,
+          <code>shutdown()</code> i zegar. Atrapy naśladują Linuksa, nie
+          WebAssembly.</li>
+      <li><strong>Nie ma</strong> tu <code>pyncat/endpoints.py</code>,
+          <code>app.py</code> ani <code>cli.py</code> — to kod, który woła
+          <code>socket()</code>, <code>connect()</code> i <code>accept()</code>,
+          więc w przeglądarce musiałby kłamać.</li>
+      <li>Liczby po prawej i w scenariuszach pochodzą z pomiarów na
+          <code>/usr/bin/nc</code> (OpenBSD netcat, Debian 1.226) albo
+          z pomiarów w Pyodide — nigdy z oszacowań.</li>
+    </ul>
+    <p class="meta" style="margin-top:0.6rem">
+      Pełne uzasadnienie, mapa darmowych tierów i rekomendacja:
+      <a href="https://github.com/damiantomczyszyn/pyncat-basic/blob/main/docs/demo-i-hosting.md"><code>docs/demo-i-hosting.md</code></a>.
+    </p>
+  </div>
+
+  <div id="boot">
+    <p>Start demo wymaga ściągnięcia CPythona skompilowanego do WebAssembly (~10 MB, raz na sesję).</p>
+    <ol>
+      <li id="boot-1">pobieranie Pyodide</li>
+      <li id="boot-2">zapis modułów pyncat do wirtualnego systemu plików</li>
+      <li id="boot-3">import <code>relay</code>, <code>netio</code>, <code>ports</code></li>
+      <li id="boot-4">przebieg scenariuszy i zebranie trace'ów</li>
+    </ol>
+    <div id="boot-err" class="fatal" hidden></div>
+  </div>
+
+  <div id="app" hidden>
+
+    <!-- ======================= maszyna stanów ======================= -->
+    <section id="machine">
+      <div class="sec-head">
+        <h2>Cztery slots, jeden socket</h2>
+        <p>
+          Cały stan połączenia w netcacie <em>jest</em> zawartością tablicy
+          <code>pfd[4]</code> — nie ma żadnych dodatkowych zmiennych.
+          <code>POLL_NETIN</code> i <code>POLL_NETOUT</code> wskazują na
+          <strong>ten sam deskryptor</strong>, mają osobne maski
+          <code>events</code> i osobne „życie”. Half-close to po prostu
+          wpisanie <code>fd = -1</code> do jednego z nich.
+        </p>
+      </div>
+
+      <div class="scen-grid">
+        <ul class="scen-list" id="scen-list"></ul>
+
+        <div>
+          <div class="lead" id="lead"></div>
+
+          <div class="slots" id="slots"></div>
+
+          <div class="meters" id="meters"></div>
+
+          <div class="codeview">
+            <header>
+              <span id="code-loc">pyncat/relay.py</span>
+              <span class="ncref" id="code-ncref"></span>
+            </header>
+            <pre id="code-src"><code></code></pre>
+            <div class="doc" id="code-doc"></div>
+          </div>
+
+          <div class="controls">
+            <button class="ctl" id="b-first" title="pierwszy krok">⏮</button>
+            <button class="ctl" id="b-prev" title="krok wstecz">◀</button>
+            <button class="ctl" data-primary id="b-play" title="odtwarzaj">▶ odtwarzaj</button>
+            <button class="ctl" id="b-next" title="krok w przód">▶</button>
+            <button class="ctl" id="b-last" title="ostatni krok">⏭</button>
+            <label><input type="checkbox" id="only-changes" checked> tylko zmiany stanu</label>
+            <label>tempo <input type="range" id="speed" min="1" max="60" value="18"></label>
+            <span class="pos" id="pos"></span>
+          </div>
+          <input type="range" class="scrub" id="scrub" min="0" max="0" value="0" aria-label="pozycja w trace">
+
+          <div class="log" id="log"></div>
+
+          <div class="outcome" id="outcome"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= porty ======================= -->
+    <section id="ports">
+      <div class="sec-head">
+        <h2>Parsowanie portów — <code>build_ports()</code></h2>
+        <p>
+          Ten panel nie potrzebuje żadnych atrap: <code>strtoport()</code>
+          i <code>build_ports()</code> to czyste parsowanie. Netcat
+          <strong>nie jest nmapem</strong> — obsługuje jeden port, jedną nazwę
+          usługi albo jeden zakres. Listy po przecinku to błąd, a zakres
+          odwrotny jest cicho zamieniany.
+        </p>
+      </div>
+      <div class="quick" id="ports-quick"></div>
+      <form class="ports-form" id="ports-form">
+        <label>specyfikacja portu
+          <input type="text" id="ports-spec" value="20-25" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="check"><input type="checkbox" id="ports-udp"> <code>-u</code> (UDP)</label>
+        <label class="check"><input type="checkbox" id="ports-rand"> <code>-r</code> (losowo)</label>
+        <button class="ctl" data-primary type="submit">Rozwiń</button>
+      </form>
+      <div id="ports-out"></div>
+      <p class="meta" id="ports-note"></p>
+    </section>
+
+    <!-- ======================= kody wyjścia ======================= -->
+    <section id="exits">
+      <div class="sec-head">
+        <h2>Kody wyjścia — tablica decyzyjna</h2>
+        <p>
+          Tabela nie jest liczona w przeglądarce, bo wymaga prawdziwych
+          połączeń. To <strong>pomiary</strong> na <code>/usr/bin/nc</code>
+          (OpenBSD netcat, Debian 1.226), wykonane
+          jako <code>nc -z -w 2 127.0.0.1 …</code>.
+        </p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Przypadek</th><th class="mono">exit</th><th>Dlaczego</th></tr></thead>
+          <tbody id="exit-rows"></tbody>
+        </table>
+      </div>
+      <p class="meta">
+        Reguła: <strong>0 ⇔ co najmniej jeden port w zakresie dał się
+        połączyć.</strong> <code>ret</code> startuje z 1; nieudane połączenia
+        robią <code>continue</code> bez dotknięcia <code>ret</code>, więc raz
+        ustawione <code>ret = 0</code> nie wraca do 1.
+      </p>
+    </section>
+
+    <!-- ======================= CI ======================= -->
+    <section id="ci">
+      <div class="sec-head">
+        <h2>Ostatni realny przebieg z CI</h2>
+        <p>
+          Tego strona nie potrafi zrobić sama. Prawdziwy transfer na
+          loopbacku odpala się w GitHub Actions, gdzie są prawdziwe sockety,
+          a wynik jest tu tylko wyświetlany.
+        </p>
+      </div>
+      <div id="ci-out"><p class="meta">wczytywanie…</p></div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div>
+    <p>
+      <strong>pyncat-basic</strong> — projekt edukacyjny: OpenBSD netcat
+      przepisany z C na Pythona. Numery linii odnoszą się do
+      <code>netcat.c</code> rev. 1.241. Kod netcata jest na licencji BSD
+      (Eric Jackson, Bob Beck) i <strong>nie został skopiowany</strong> do
+      tego repozytorium — odtworzone są algorytmy i semantyka, z odwołaniami
+      do nazw funkcji i numerów linii.
+    </p>
+    <p>
+      Czego pyncat nie ma, świadomie: wykonywania poleceń (<code>-e</code>),
+      TLS, proxy, gniazd uniksowych, SCTP, <code>-F</code>, <code>-t</code>.
+      OpenBSD nie przepisał <code>-e</code> z netcata 1.10 celowo i to jest
+      granica tego projektu: narzędzie przekazuje bajty między stdin/stdout
+      a socketem, nie uruchamia procesów.
+    </p>
+    <p class="meta">
+      Łączyć się i nasłuchiwać wolno wyłącznie na własnej infrastrukturze
+      albo za pisemną zgodą właściciela.
+    </p>
+  </div>
+</footer>
+
+<script src="modules.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
